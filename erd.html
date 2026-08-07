@@ -230,7 +230,7 @@
   <p class="subtitle">Before any SQL, every one of these queries starts with the same question: how does this data actually fit together? The published ER diagram for this database turns out to have six connectors drawn incorrectly — caught not by assumption, but by checking every relationship directly against the live schema. Step through how that happened, and how the diagram gets reorganized once it's corrected.</p>
 
   <div class="diagram-card">
-    <svg id="erd-svg" viewBox="0 0 1200 960" xmlns="http://www.w3.org/2000/svg"></svg>
+    <svg id="erd-svg" viewBox="0 0 1200 1060" xmlns="http://www.w3.org/2000/svg"></svg>
     <img id="erd-img" src="erd-original.png" alt="The original published ER diagram" style="display:none; width:100%; border-radius:8px;">
   </div>
 
@@ -242,7 +242,7 @@
 
   <div class="step-panel">
     <h2 id="panelTitle"></h2>
-    <p id="panelBody"></p>
+    <div id="panelBody"></div>
   </div>
 
   <details class="caveats" style="display:none">
@@ -258,6 +258,13 @@
 
 <script>
 const TW = 126;
+const SYM_D2 = 16;
+
+// Outer extent of each symbol (where the connector trunk meets it).
+// '1' extends equally past its outer tick for symmetry: D1=8, D2=16, extension=8 → outer=24.
+function symOuter(code) {
+  return code === '1' ? 24 : SYM_D2;
+}
 const HEADER_H = 26;
 const COL_H = 15;
 const BODY_PAD = 6;
@@ -286,39 +293,39 @@ const tables = {
 // address centered between staff (center 600) and payment (center 806) → x=640
 const treePos = {
   rental:        { x: 537, y: 20  },
-  inventory:     { x: 125, y: 200 },
-  store:         { x: 331, y: 200 },
-  staff:         { x: 537, y: 200 },
-  payment:       { x: 743, y: 200 },
-  customer:      { x: 949, y: 200 },
-  film:          { x: 125, y: 440 },
-  address:       { x: 640, y: 440 },
-  film_category: { x: 42,  y: 680 },
-  film_actor:    { x: 208, y: 680 },
-  city:          { x: 640, y: 680 },
-  category:      { x: 42,  y: 800 },
-  actor:         { x: 208, y: 800 },
-  country:       { x: 640, y: 800 },
+  inventory:     { x: 125, y: 276 },
+  store:         { x: 331, y: 276 },
+  staff:         { x: 537, y: 276 },
+  payment:       { x: 743, y: 276 },
+  customer:      { x: 949, y: 276 },
+  film:          { x: 125, y: 435 },
+  address:       { x: 640, y: 545 },
+  film_category: { x: 42,  y: 692 },
+  film_actor:    { x: 208, y: 692 },
+  city:          { x: 640, y: 754 },
+  category:      { x: 42,  y: 836 },
+  actor:         { x: 208, y: 836 },
+  country:       { x: 640, y: 903 },
 };
 
 const conns = [
-  ['film_category','category', '1','zM', true],
-  ['film_category','film',     '1','zM', true, { from:'top', to:'bottom-left'  }],
-  ['film_actor','film',        '1','zM', true, { from:'top', to:'bottom-right' }],
-  ['film_actor','actor',       '1','zM', true],
-  ['inventory','film',         'zM','1', false],
-  ['rental','inventory',       'zM','1', true,  { from:'left',   to:'top'  }],
-  ['rental','customer',        'zM','1', true,  { from:'right',  to:'top'  }],
-  ['rental','staff',           'zM','1', false],
-  ['payment','rental',         'zM','1', false, { from:'top', to:'bottom-right' }],
-  ['payment','customer',       'zM','1', false, { from:'right', to:'left',  yRef:['store','right'], yOffset:10 }],
-  ['payment','staff',          'zM','1', false, { from:'left',  to:'right', yRef:['store','right'], yOffset:10 }],
-  ['store','staff',            'z1','1', false, { from:'right', to:'left',  yRef:['store','right'], yOffset:10 }],
-  ['customer','address',       'zM','1', false, { from:'bottom', to:'right' }],
-  ['staff','address',          'zM','1', false, { from:'bottom-right', to:'top' }],
-  ['store','address',          'zM','1', false, { from:'bottom', to:'left' }],
-  ['address','city',           'zM','1', false],
-  ['city','country',           'zM','1', false],
+  ['film_category','category', 'z1','1', true,  { from:'bottom', to:'top'         }],
+  ['film_category','film',     'z1','1', true,  { from:'top',    to:'bottom-left' }],
+  ['film_actor','film',        'z1','1', true,  { from:'top',    to:'bottom-right'}],
+  ['film_actor','actor',       'z1','1', true,  { from:'bottom', to:'top'         }],
+  ['inventory','film',         'zM','1', false, { from:'bottom', to:'top'         }],
+  ['rental','inventory',       'z1','1', true,  { from:'left',   to:'top'         }],
+  ['rental','customer',        'z1','1', true,  { from:'right',  to:'top'         }],
+  ['rental','staff',           'zM','1', false, { from:'bottom', to:'top'         }],
+  ['payment','rental',         'zM','1', false, { from:'top',    to:'bottom-right'}],
+  ['payment','customer',       'zM','1', false, { from:'right',  to:'left',  yRef:['store','right'], yOffset:10 }],
+  ['payment','staff',          'zM','1', false, { from:'left',   to:'right', yRef:['store','right'], yOffset:10 }],
+  ['store','staff',            'z1','1', false, { from:'right',  to:'left',  yRef:['store','right'], yOffset:10 }],
+  ['customer','address',       'zM','1', false, { from:'bottom', to:'right'        }],
+  ['staff','address',          'zM','1', false, { from:'bottom-right', to:'top'    }],
+  ['store','address',          'zM','1', false, { from:'bottom', to:'left'         }],
+  ['address','city',           'zM','1', false, { from:'bottom', to:'top'          }],
+  ['city','country',           'zM','1', false, { from:'bottom', to:'top'          }],
 ];
 
 const svg = document.getElementById('erd-svg');
@@ -344,14 +351,36 @@ function edgePt(pos, id, side, fixedY) {
   return center(pos, id); // 'center' or unrecognised → center
 }
 
-function notation(x, y, dx, dy, code, color) {
-  const px = -dy, py = dx;           // perpendicular unit vector
-  const T = 6, D1 = 8, D2 = 16, S = 6;
-  let g = `<g stroke="${color}" stroke-width="1.5" fill="none">`;
+function sideNormal(side) {
+  const s = 1 / Math.sqrt(2);
+  return {
+    'top':          [  0, -1 ],
+    'bottom':       [  0,  1 ],
+    'left':         [ -1,  0 ],
+    'right':        [  1,  0 ],
+    'top-left':     [ -s, -s ],
+    'top-right':    [  s, -s ],
+    'bottom-left':  [ -s,  s ],
+    'bottom-right': [  s,  s ],
+  }[side] || null;
+}
+
+function notation(x, y, dx, dy, code, color, strokeWidth) {
+  strokeWidth = strokeWidth || 1.5;
+  const px = -dy, py = dx;
+  const T = 6, D1 = 8, D2 = SYM_D2, S = 6;
+  const outerD = symOuter(code);
+  const isDiag = Math.abs(dx) > 0.1 && Math.abs(dy) > 0.1;
+  const inset = isDiag ? 2 : 0;
+  const bx = x - dx*inset, by = y - dy*inset;
+
+  let g = `<g stroke="${color}" stroke-width="${strokeWidth}" fill="none">`;
+  g += `<line x1="${x+dx*outerD}" y1="${y+dy*outerD}" x2="${bx}" y2="${by}"/>`;
   if (code === 'zM') {
-    g += `<line x1="${x+dx*D1-px*S}" y1="${y+dy*D1-py*S}" x2="${x}" y2="${y}"/>`;
-    g += `<line x1="${x+dx*D1}"       y1="${y+dy*D1}"       x2="${x}" y2="${y}"/>`;
-    g += `<line x1="${x+dx*D1+px*S}" y1="${y+dy*D1+py*S}" x2="${x}" y2="${y}"/>`;
+    const ax = x + dx*D1, ay = y + dy*D1;
+    g += `<line x1="${ax}" y1="${ay}" x2="${bx-px*S}" y2="${by-py*S}"/>`;
+    g += `<line x1="${ax}" y1="${ay}" x2="${bx}"      y2="${by}"/>`;
+    g += `<line x1="${ax}" y1="${ay}" x2="${bx+px*S}" y2="${by+py*S}"/>`;
     g += `<circle cx="${x+dx*D2}" cy="${y+dy*D2}" r="3" fill="white"/>`;
   } else if (code === '1') {
     g += `<line x1="${x+dx*D1-px*T}" y1="${y+dy*D1-py*T}" x2="${x+dx*D1+px*T}" y2="${y+dy*D1+py*T}"/>`;
@@ -378,14 +407,31 @@ function draw(pos, opts) {
     if (opts.correctedSymbols && wrong) { symFromShown = 'zM'; }
     if (opts.showCorrectColor) cls += wrong ? ' wrong' : ' correct';
 
-    svgContent += `<line class="${cls}" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" />`;
+    const dist = Math.sqrt((b.x-a.x)**2 + (b.y-a.y)**2);
+    const ux = (b.x-a.x)/dist, uy = (b.y-a.y)/dist;
+    const fromN = route && sideNormal(route.from);
+    const toN   = route && sideNormal(route.to);
+    const adx = fromN ? fromN[0] :  ux, ady = fromN ? fromN[1] :  uy;
+    const bdx = toN   ? toN[0]   : -ux, bdy = toN   ? toN[1]   : -uy;
+
+    const aOuter = symOuter(symFromShown);
+    const bOuter = symOuter(symToShown);
+    svgContent += `<line class="${cls}" x1="${a.x+adx*aOuter}" y1="${a.y+ady*aOuter}" x2="${b.x+bdx*bOuter}" y2="${b.y+bdy*bOuter}" />`;
 
     if (opts.showSymbols) {
-      const dist = Math.sqrt((b.x-a.x)**2 + (b.y-a.y)**2);
-      const ux = (b.x-a.x)/dist, uy = (b.y-a.y)/dist;
-      const notColor = cls.includes('correct') ? '#2D7D7B' : cls.includes('wrong') ? '#B8860B' : '#999';
-      svgContent += notation(a.x, a.y,  ux,  uy, symFromShown, notColor);
-      svgContent += notation(b.x, b.y, -ux, -uy, symToShown,   notColor);
+      const isUncorrectedWrong = cls.includes('wrong') && !opts.showCorrectColor;
+      let fromColor, toColor, fromStroke;
+      if (cls.includes('correct')) {
+        fromColor = toColor = '#2D7D7B'; fromStroke = 1.5;
+      } else if (cls.includes('wrong')) {
+        fromColor = '#B8860B';
+        toColor   = isUncorrectedWrong ? '#999' : '#2D7D7B';
+        fromStroke = isUncorrectedWrong ? 2.5 : 1.5;
+      } else {
+        fromColor = toColor = '#999'; fromStroke = 1.5;
+      }
+      svgContent += notation(a.x, a.y, adx, ady, symFromShown, fromColor, fromStroke);
+      svgContent += notation(b.x, b.y, bdx, bdy, symToShown,   toColor,   1.5);
     }
   });
 
@@ -409,16 +455,34 @@ function draw(pos, opts) {
     svgContent += `</g>`;
   });
 
+  if (opts.showSymbolKey) {
+    const tableX = 62, yBase = 994, rowH = 24;
+    const rows = [
+      { code: 'zM', label: 'Zero or many' },
+      { code: 'z1', label: 'Zero or one'  },
+      { code: '1',  label: 'Exactly one'  },
+    ];
+    rows.forEach(({ code, label }, i) => {
+      const y = yBase + i * rowH;
+      const od = symOuter(code);
+      if (code !== '1') {
+        svgContent += `<line stroke="#999" stroke-width="1.5" x1="${tableX - od - 8}" y1="${y}" x2="${tableX - od}" y2="${y}"/>`;
+      }
+      svgContent += notation(tableX, y, -1, 0, code, '#999');
+      svgContent += `<text font-family="JetBrains Mono, monospace" font-size="10" fill="#555" x="${tableX + 12}" y="${y + 4}">${label}</text>`;
+    });
+  }
+
   if (opts.showInDiagramKey) {
     if (opts.showInDiagramKey === 'both') {
-      svgContent += `<circle cx="38" cy="910" r="5" fill="#2D7D7B"/>
-      <text font-family="JetBrains Mono, monospace" font-size="11" fill="#666" x="50" y="914">Originally correct</text>
-      <circle cx="38" cy="934" r="5" fill="#B8860B"/>
-      <text font-family="JetBrains Mono, monospace" font-size="11" fill="#666" x="50" y="938">Corrected based on schema</text>`;
+      svgContent += `<circle cx="175" cy="994" r="5" fill="#B8860B"/>
+      <text font-family="JetBrains Mono, monospace" font-size="11" fill="#666" x="187" y="998">Corrected connector</text>
+      <circle cx="175" cy="1018" r="5" fill="#2D7D7B"/>
+      <text font-family="JetBrains Mono, monospace" font-size="11" fill="#666" x="187" y="1022">Originally correct</text>`;
     } else {
       const label = opts.showInDiagramKey === 'corrected' ? 'Corrected connector' : 'Incorrect connector';
-      svgContent += `<circle cx="38" cy="920" r="5" fill="#B8860B"/>
-      <text font-family="JetBrains Mono, monospace" font-size="11" fill="#666" x="50" y="924">${label}</text>`;
+      svgContent += `<circle cx="175" cy="994" r="5" fill="#B8860B"/>
+      <text font-family="JetBrains Mono, monospace" font-size="11" fill="#666" x="187" y="998">${label}</text>`;
     }
   }
 
@@ -435,22 +499,20 @@ const steps = [
   {
     title: 'Untangling the diagram',
     body: "Same tables, same relationships, same symbols as published — just reorganized for clarity. Nothing has been checked or corrected yet — this is just a more readable arrangement of the original claims.",
-    pos: treePos, opts: { showSymbols: true }
+    pos: treePos, opts: { showSymbols: true, showSymbolKey: true }
   },
   {
     title: 'Checking every connector against the live schema',
     body: 'Rather than trust the diagram, every relationship was checked directly against the actual database — primary keys, foreign keys, and unique constraints, pulled straight from Postgres. Six connectors in the ERD turned out to be incorrectly stating the relationships hardcoded in the database: four around junction tables (film_category, film_actor) and two others (rental↔customer, rental↔inventory). All six were drawn as "capped at one" when the schema clearly allows many.',
-    pos: treePos, opts: { showSymbols: true, showErrors: true, showInDiagramKey: 'incorrect' }
-  },
-  {
-    title: 'Correcting the symbols',
-    body: 'Each of the six flagged connectors gets its symbol corrected — from “zero-or-one” to “zero-or-many” — matching what the schema actually enforces. Everything else on the diagram was checked too, and left unchanged: most of the original notation is accurate.',
-    pos: treePos, opts: { showSymbols: true, correctedSymbols: true, showErrors: true, showInDiagramKey: 'corrected' }
+    pos: treePos, opts: { showSymbols: true, showErrors: true, showInDiagramKey: 'incorrect', showSymbolKey: true }
   },
   {
     title: 'The corrected, reorganized schema',
-    body: 'Teal marks every connector verified as originally correct; amber marks the six that were corrected based on the schema. This is the version used as reference throughout the four queries that follow. A few things this diagram knowingly omits are noted in the caveats section below.',
-    pos: treePos, opts: { showSymbols: true, correctedSymbols: true, showCorrectColor: true, showInDiagramKey: 'both', showCaveats: true }
+    body: [
+      'Each of the six flagged connectors gets its symbol corrected — from “zero-or-one” to “zero-or-many” — matching what the schema actually enforces. Everything else on the diagram was checked too, and left unchanged: most of the original notation is accurate.',
+      'Amber marks the six corrected connectors; teal marks every connector verified as originally correct. This is the version used as reference throughout the four queries that follow. A few things this diagram knowingly omits are noted in the caveats section below.'
+    ],
+    pos: treePos, opts: { showSymbols: true, correctedSymbols: true, showCorrectColor: true, showInDiagramKey: 'both', showCaveats: true, showSymbolKey: true }
   }
 ];
 
@@ -471,7 +533,9 @@ function render() {
   }
   document.querySelector('.caveats').style.display = (s.opts && s.opts.showCaveats) ? 'block' : 'none';
   document.getElementById('panelTitle').textContent = s.title;
-  document.getElementById('panelBody').textContent = s.body;
+  const bodyEl = document.getElementById('panelBody');
+  const paras = Array.isArray(s.body) ? s.body : [s.body];
+  bodyEl.innerHTML = paras.map(t => `<p>${t}</p>`).join('');
   document.getElementById('stepLabel').textContent = `Step ${stepIdx+1} of ${steps.length}`;
   document.getElementById('prevBtn').disabled = stepIdx === 0;
   document.getElementById('nextBtn').disabled = stepIdx === steps.length - 1;
