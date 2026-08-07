@@ -79,12 +79,11 @@
 
   svg { width: 100%; height: auto; display: block; }
 
-  .table-box rect {
+  .table-box rect.outer {
     fill: var(--bg-secondary);
     stroke: var(--border-faint);
     stroke-width: 1.5;
   }
-  .table-box.hub rect { stroke: var(--teal); stroke-width: 2; }
   .table-box text.tname {
     font-family: 'JetBrains Mono', monospace;
     font-weight: 600;
@@ -100,7 +99,6 @@
   }
   .conn.wrong { stroke: var(--amber); stroke-width: 2; }
   .conn.correct { stroke: var(--teal); }
-  .conn.phantom { stroke: #999; stroke-dasharray: 4 3; }
 
   .sym {
     font-family: 'JetBrains Mono', monospace;
@@ -156,19 +154,64 @@
     opacity: 0.85;
   }
   .step-panel p + p { margin-top: 0.8rem; }
-  .legend {
-    display: flex;
-    gap: 1.2rem;
-    margin-top: 1rem;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.72rem;
-    color: var(--text-muted);
+
+  /* Caveats section */
+  .caveats {
+    margin-top: 3rem;
+    border: 1px solid var(--border-faint);
+    border-radius: 16px;
+    overflow: hidden;
   }
-  .legend span { display: flex; align-items: center; gap: 0.35rem; }
-  .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
-  .dot.teal { background: var(--teal); }
-  .dot.amber { background: var(--amber); }
-  .dash { width: 14px; height: 0; border-top: 2px dashed #999; display: inline-block; }
+  .caveats summary {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    padding: 1rem 1.5rem;
+    cursor: pointer;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--bg-secondary);
+  }
+  .caveats summary::-webkit-details-marker { display: none; }
+  .caveats summary::before {
+    content: '▶';
+    font-size: 0.6rem;
+    transition: transform 0.2s ease;
+  }
+  .caveats[open] summary::before { transform: rotate(90deg); }
+  .caveats summary:hover { color: var(--text-main); }
+  .caveats-body {
+    padding: 0 1.75rem 1.75rem;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border-faint);
+  }
+  .caveats-body h3 {
+    font-size: 0.9rem;
+    font-weight: 700;
+    margin-top: 1.5rem;
+    margin-bottom: 0.4rem;
+  }
+  .caveats-body p {
+    font-size: 0.88rem;
+    line-height: 1.7;
+    color: var(--text-main);
+    opacity: 0.85;
+  }
+  .caveats-body a {
+    color: var(--teal);
+    text-decoration: none;
+  }
+  .caveats-body a:hover { text-decoration: underline; }
+  code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82em;
+    background: var(--teal-soft);
+    padding: 0.1em 0.35em;
+    border-radius: 4px;
+  }
 </style>
 </head>
 <body>
@@ -187,7 +230,7 @@
   <p class="subtitle">Before any SQL, every one of these queries starts with the same question: how does this data actually fit together? The published ER diagram for this database turns out to have six connectors drawn incorrectly — caught not by assumption, but by checking every relationship directly against the live schema. Step through how that happened, and how the diagram gets reorganized once it's corrected.</p>
 
   <div class="diagram-card">
-    <svg id="erd-svg" viewBox="0 0 1040 760" xmlns="http://www.w3.org/2000/svg"></svg>
+    <svg id="erd-svg" viewBox="0 0 1200 960" xmlns="http://www.w3.org/2000/svg"></svg>
     <img id="erd-img" src="erd-original.png" alt="The original published ER diagram" style="display:none; width:100%; border-radius:8px;">
   </div>
 
@@ -200,106 +243,135 @@
   <div class="step-panel">
     <h2 id="panelTitle"></h2>
     <p id="panelBody"></p>
-    <div class="legend">
-      <span><span class="dot teal"></span> Verified correct</span>
-      <span><span class="dot amber"></span> Verified incorrect</span>
-      <span><span class="dash"></span> Unenforced (no FK constraint)</span>
-    </div>
   </div>
 
+  <details class="caveats" style="display:none">
+    <summary>Caveats &amp; omissions</summary>
+    <div class="caveats-body">
+      <h3>The <code>language</code> table is real, and is missing from this diagram</h3>
+      <p><code>film.language_id</code> is a NOT NULL foreign key pointing at <code>language</code>, meaning every film row must reference a valid language. The table exists in the live schema and carries data. It was missing from the original published diagram and is omitted from this redraw for the same reason it was likely left out originally: it hangs off <code>film</code> with no further relationships, so it adds a node without adding structure. That's a choice worth naming rather than quietly making.</p>
+
+      <h3>Three columns look like foreign keys but aren't enforced</h3>
+      <p><code>staff.store_id</code>, <code>inventory.store_id</code>, and <code>customer.store_id</code> each reference <code>store</code> in practice, but Postgres carries no FK constraint behind any of them — the schema will accept a value that points nowhere. This is a quirk of the Sakila sample database design, not something introduced by this analysis. These are omitted from the diagram because their absence from the constraint system means there's nothing architectural to show — just a convention the data happens to follow.</p>
+    </div>
+  </details>
+
 <script>
-// ---- Table definitions: id, label, width, height ----
+const TW = 126;
+const HEADER_H = 26;
+const COL_H = 15;
+const BODY_PAD = 6;
+
 const tables = {
-  category:      { label: 'category',      w: 110, h: 34 },
-  film_category: { label: 'film_category',  w: 130, h: 34 },
-  film:          { label: 'film',           w: 90,  h: 34 },
-  film_actor:    { label: 'film_actor',     w: 110, h: 34 },
-  actor:         { label: 'actor',          w: 90,  h: 34 },
-  language:      { label: 'language',       w: 100, h: 34 },
-  inventory:     { label: 'inventory',      w: 100, h: 34 },
-  rental:        { label: 'rental',         w: 90,  h: 34, hub: true },
-  payment:       { label: 'payment',        w: 100, h: 34 },
-  customer:      { label: 'customer',       w: 100, h: 34 },
-  staff:         { label: 'staff',          w: 80,  h: 34 },
-  store:         { label: 'store',          w: 80,  h: 34 },
-  address:       { label: 'address',        w: 100, h: 34 },
-  city:          { label: 'city',           w: 80,  h: 34 },
-  country:       { label: 'country',        w: 90,  h: 34 },
+  category:      { label: 'category',      cols: ['* category_id', 'name'] },
+  film_category: { label: 'film_category',  cols: ['* film_id', '* category_id'] },
+  film:          { label: 'film',           cols: ['* film_id', 'title', 'description', 'release_year', 'rental_duration', 'rental_rate', 'length', 'replacement_cost', 'rating', 'fulltext'] },
+  film_actor:    { label: 'film_actor',     cols: ['* actor_id', '* film_id'] },
+  actor:         { label: 'actor',          cols: ['* actor_id', 'first_name', 'last_name'] },
+  language:      { label: 'language',       cols: [] },
+  inventory:     { label: 'inventory',      cols: ['* inventory_id', 'film_id', 'store_id'] },
+  rental:        { label: 'rental',         cols: ['* rental_id', 'rental_date', 'inventory_id', 'customer_id', 'return_date', 'staff_id'] },
+  payment:       { label: 'payment',        cols: ['* payment_id', 'customer_id', 'staff_id', 'rental_id', 'amount', 'payment_date'] },
+  customer:      { label: 'customer',       cols: ['* customer_id', 'store_id', 'first_name', 'last_name', 'email', 'address_id', 'activebool', 'create_date', 'active'] },
+  staff:         { label: 'staff',          cols: ['* staff_id', 'first_name', 'last_name', 'address_id', 'email', 'store_id', 'active', 'username', 'password', 'picture'] },
+  store:         { label: 'store',          cols: ['* store_id', 'manager_staff_id', 'address_id'] },
+  address:       { label: 'address',        cols: ['* address_id', 'address', 'address2', 'district', 'city_id', 'postal_code', 'phone'] },
+  city:          { label: 'city',           cols: ['* city_id', 'city', 'country_id'] },
+  country:       { label: 'country',        cols: ['* country_id', 'country'] },
 };
 
-// ---- Org-chart layout: strict rows per Ed's placement spec ----
+// Row y positions sized to the tallest box in each row (staff/film at 183px) + 57px gap
+// Row 2: 5 tables, 80px gaps, centered in 1200px viewBox → rental and staff share x=537
+// film (x=125) sits directly below inventory (x=125); film_category (x=42) and film_actor (x=208) are evenly spaced below film center (188)
+// address centered between staff (center 600) and payment (center 806) → x=640
 const treePos = {
-  rental:        { x: 475, y: 80  },
-  inventory:     { x: 190, y: 220 },
-  store:         { x: 360, y: 220 },
-  staff:         { x: 480, y: 220 },
-  payment:       { x: 610, y: 220 },
-  customer:      { x: 750, y: 220 },
-  film:          { x: 195, y: 360 },
-  address:       { x: 540, y: 360 },
-  film_category: { x: 110, y: 500 },
-  film_actor:    { x: 260, y: 500 },
-  city:          { x: 550, y: 500 },
-  category:      { x: 120, y: 640 },
-  actor:         { x: 270, y: 640 },
-  country:       { x: 545, y: 640 },
+  rental:        { x: 537, y: 20  },
+  inventory:     { x: 125, y: 200 },
+  store:         { x: 331, y: 200 },
+  staff:         { x: 537, y: 200 },
+  payment:       { x: 743, y: 200 },
+  customer:      { x: 949, y: 200 },
+  film:          { x: 125, y: 440 },
+  address:       { x: 640, y: 440 },
+  film_category: { x: 42,  y: 680 },
+  film_actor:    { x: 208, y: 680 },
+  city:          { x: 640, y: 680 },
+  category:      { x: 42,  y: 800 },
+  actor:         { x: 208, y: 800 },
+  country:       { x: 640, y: 800 },
 };
 
-// ---- Connections: [from, to, symbolAtFrom, symbolAtTo, wrongFlag] ----
-// symbol codes: '1' = mandatory one (double tick), 'z1' = zero-or-one (circle+tick), 'zM' = zero-or-many (circle+crowfoot)
 const conns = [
-  ['film_category','category', '1','zM', true],   // wrong: was drawn z1, should be zM
-  ['film_category','film',     '1','zM', true],
-  ['film_actor','film',        '1','zM', true],
+  ['film_category','category', '1','zM', true],
+  ['film_category','film',     '1','zM', true, { from:'top', to:'bottom-left'  }],
+  ['film_actor','film',        '1','zM', true, { from:'top', to:'bottom-right' }],
   ['film_actor','actor',       '1','zM', true],
   ['inventory','film',         'zM','1', false],
-  ['rental','inventory',       'zM','1', true],
-  ['rental','customer',        'zM','1', true],
+  ['rental','inventory',       'zM','1', true,  { from:'left',   to:'top'  }],
+  ['rental','customer',        'zM','1', true,  { from:'right',  to:'top'  }],
   ['rental','staff',           'zM','1', false],
-  ['payment','rental',         'zM','1', false],
-  ['payment','customer',       'zM','1', false],
-  ['payment','staff',          'zM','1', false],
-  ['store','staff',            'z1','1', false],  // manager_staff_id — the only enforced staff<->store FK
-  ['customer','address',       'zM','1', false],
-  ['staff','address',          'zM','1', false],
-  ['store','address',          'zM','1', false],
+  ['payment','rental',         'zM','1', false, { from:'top', to:'bottom-right' }],
+  ['payment','customer',       'zM','1', false, { from:'right', to:'left',  yRef:['store','right'], yOffset:10 }],
+  ['payment','staff',          'zM','1', false, { from:'left',  to:'right', yRef:['store','right'], yOffset:10 }],
+  ['store','staff',            'z1','1', false, { from:'right', to:'left',  yRef:['store','right'], yOffset:10 }],
+  ['customer','address',       'zM','1', false, { from:'bottom', to:'right' }],
+  ['staff','address',          'zM','1', false, { from:'bottom-right', to:'top' }],
+  ['store','address',          'zM','1', false, { from:'bottom', to:'left' }],
   ['address','city',           'zM','1', false],
   ['city','country',           'zM','1', false],
 ];
 
-// ---- Unenforced "phantom" FKs: real columns, no FK constraint in the schema ----
-// Not part of the original published diagram — shown only in the final,
-// fully-corrected step as a discovered addition, not a correction.
-const phantomConns = [
-  ['staff','store',     'zM','1'],
-  ['inventory','store',  'zM','1'],
-  ['customer','store',   'zM','1'],
-];
-
 const svg = document.getElementById('erd-svg');
-const NS = 'http://www.w3.org/2000/svg';
 
-function center(pos, id) {
-  const t = tables[id];
-  return { x: pos[id].x + t.w/2, y: pos[id].y + t.h/2 };
+function tableHeight(id) {
+  return HEADER_H + 1 + tables[id].cols.length * COL_H + BODY_PAD;
 }
 
-function renderSymbol(code, x, y, flip) {
-  // returns a small text glyph representing the cardinality mark
-  const map = { '1': '⊣⊢', 'z1': '○⊣', 'zM': '○<' };
-  return `<text class="sym" x="${x}" y="${y}" text-anchor="middle">${map[code]}</text>`;
+function center(pos, id) {
+  return { x: pos[id].x + TW / 2, y: pos[id].y + tableHeight(id) / 2 };
+}
+
+function edgePt(pos, id, side, fixedY) {
+  const p = pos[id];
+  const h = tableHeight(id);
+  const midY = fixedY !== undefined ? fixedY : p.y + h / 2;
+  if (side === 'left')         return { x: p.x,        y: midY };
+  if (side === 'right')        return { x: p.x + TW,   y: midY };
+  if (side === 'top')          return { x: p.x + TW/2, y: p.y };
+  if (side === 'bottom')       return { x: p.x + TW/2, y: p.y + h };
+  if (side === 'bottom-right') return { x: p.x + TW,   y: p.y + h };
+  if (side === 'bottom-left')  return { x: p.x,         y: p.y + h };
+  return center(pos, id); // 'center' or unrecognised → center
+}
+
+function notation(x, y, dx, dy, code, color) {
+  const px = -dy, py = dx;           // perpendicular unit vector
+  const T = 6, D1 = 8, D2 = 16, S = 6;
+  let g = `<g stroke="${color}" stroke-width="1.5" fill="none">`;
+  if (code === 'zM') {
+    g += `<line x1="${x+dx*D1-px*S}" y1="${y+dy*D1-py*S}" x2="${x}" y2="${y}"/>`;
+    g += `<line x1="${x+dx*D1}"       y1="${y+dy*D1}"       x2="${x}" y2="${y}"/>`;
+    g += `<line x1="${x+dx*D1+px*S}" y1="${y+dy*D1+py*S}" x2="${x}" y2="${y}"/>`;
+    g += `<circle cx="${x+dx*D2}" cy="${y+dy*D2}" r="3" fill="white"/>`;
+  } else if (code === '1') {
+    g += `<line x1="${x+dx*D1-px*T}" y1="${y+dy*D1-py*T}" x2="${x+dx*D1+px*T}" y2="${y+dy*D1+py*T}"/>`;
+    g += `<line x1="${x+dx*D2-px*T}" y1="${y+dy*D2-py*T}" x2="${x+dx*D2+px*T}" y2="${y+dy*D2+py*T}"/>`;
+  } else if (code === 'z1') {
+    g += `<line x1="${x+dx*D1-px*T}" y1="${y+dy*D1-py*T}" x2="${x+dx*D1+px*T}" y2="${y+dy*D1+py*T}"/>`;
+    g += `<circle cx="${x+dx*D2}" cy="${y+dy*D2}" r="3" fill="white"/>`;
+  }
+  return g + `</g>`;
 }
 
 function draw(pos, opts) {
   opts = opts || {};
   let svgContent = '';
 
-  // connectors first (so boxes sit on top)
-  conns.forEach(([from, to, symFrom, symTo, wrong]) => {
-    const a = center(pos, from);
-    const b = center(pos, to);
-    const midX = (a.x + b.x) / 2;
-    const midY = (a.y + b.y) / 2;
+  // connectors first (boxes sit on top)
+  conns.forEach(([from, to, symFrom, symTo, wrong, route]) => {
+    const fixedY = (route && route.yRef) ? edgePt(pos, route.yRef[0], route.yRef[1]).y + (route.yOffset || 0) : undefined;
+    const a = route ? edgePt(pos, from, route.from, fixedY) : center(pos, from);
+    const b = route ? edgePt(pos, to,   route.to,   fixedY) : center(pos, to);
     let cls = 'conn';
     let symFromShown = symFrom, symToShown = symTo;
     if (opts.showErrors && wrong) cls += ' wrong';
@@ -309,35 +381,46 @@ function draw(pos, opts) {
     svgContent += `<line class="${cls}" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" />`;
 
     if (opts.showSymbols) {
-      const t1x = a.x + (b.x - a.x) * 0.15, t1y = a.y + (b.y - a.y) * 0.15 - 6;
-      const t2x = a.x + (b.x - a.x) * 0.85, t2y = a.y + (b.y - a.y) * 0.85 - 6;
-      let symClass1 = 'sym', symClass2 = 'sym';
-      if (opts.showErrors && wrong) symClass2 = 'sym wrong';
-      if (opts.correctedSymbols && wrong) symClass2 = 'sym correct';
-      svgContent += renderSymbol(symFromShown, t1x, t1y).replace('class="sym"', `class="${symClass1}"`);
-      svgContent += renderSymbol(symToShown, t2x, t2y).replace('class="sym"', `class="${symClass2}"`);
+      const dist = Math.sqrt((b.x-a.x)**2 + (b.y-a.y)**2);
+      const ux = (b.x-a.x)/dist, uy = (b.y-a.y)/dist;
+      const notColor = cls.includes('correct') ? '#2D7D7B' : cls.includes('wrong') ? '#B8860B' : '#999';
+      svgContent += notation(a.x, a.y,  ux,  uy, symFromShown, notColor);
+      svgContent += notation(b.x, b.y, -ux, -uy, symToShown,   notColor);
     }
   });
 
-  // phantom (unenforced) connectors — dashed, no cardinality claim implied
-  if (opts.showPhantom) {
-    phantomConns.forEach(([from, to, symFrom, symTo]) => {
-      const a = center(pos, from);
-      const b = center(pos, to);
-      svgContent += `<line class="conn phantom" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" />`;
-    });
-  }
-
-  // table boxes (skip any table with no position in this layout — e.g. language, omitted)
+  // table boxes
   Object.keys(tables).filter(id => pos[id]).forEach(id => {
     const t = tables[id];
     const p = pos[id];
-    const cls = t.hub ? 'table-box hub' : 'table-box';
-    svgContent += `<g class="${cls}">
-      <rect x="${p.x}" y="${p.y}" width="${t.w}" height="${t.h}" rx="8"/>
-      <text class="tname" x="${p.x + t.w/2}" y="${p.y + t.h/2 + 4}" text-anchor="middle">${t.label}</text>
-    </g>`;
+    const h = tableHeight(id);
+
+    svgContent += `<g class="table-box">
+      <rect class="outer" x="${p.x}" y="${p.y}" width="${TW}" height="${h}" rx="6"/>
+      <text class="tname" x="${p.x + TW / 2}" y="${p.y + HEADER_H / 2 + 4}" text-anchor="middle">${t.label}</text>
+      <line x1="${p.x}" y1="${p.y + HEADER_H}" x2="${p.x + TW}" y2="${p.y + HEADER_H}" stroke="#E0D8CF" stroke-width="1"/>`;
+
+    t.cols.forEach((col, i) => {
+      const cy = p.y + HEADER_H + BODY_PAD + i * COL_H + 10;
+      const isPK = col.startsWith('* ');
+      svgContent += `<text font-family="JetBrains Mono, monospace" font-size="10" fill="${isPK ? '#1A1A18' : '#888'}" font-weight="${isPK ? '600' : '400'}" x="${p.x + 8}" y="${cy}">${col}</text>`;
+    });
+
+    svgContent += `</g>`;
   });
+
+  if (opts.showInDiagramKey) {
+    if (opts.showInDiagramKey === 'both') {
+      svgContent += `<circle cx="38" cy="910" r="5" fill="#2D7D7B"/>
+      <text font-family="JetBrains Mono, monospace" font-size="11" fill="#666" x="50" y="914">Originally correct</text>
+      <circle cx="38" cy="934" r="5" fill="#B8860B"/>
+      <text font-family="JetBrains Mono, monospace" font-size="11" fill="#666" x="50" y="938">Corrected based on schema</text>`;
+    } else {
+      const label = opts.showInDiagramKey === 'corrected' ? 'Corrected connector' : 'Incorrect connector';
+      svgContent += `<circle cx="38" cy="920" r="5" fill="#B8860B"/>
+      <text font-family="JetBrains Mono, monospace" font-size="11" fill="#666" x="50" y="924">${label}</text>`;
+    }
+  }
 
   svg.innerHTML = svgContent;
 }
@@ -347,27 +430,27 @@ const steps = [
     type: 'image',
     src: 'erd-original.png',
     title: 'The published diagram',
-    body: 'Fifteen tables, laid out as a flat grid — every box the same size, no visual hierarchy. This is the ER diagram as originally published for this database. On its face, it looks complete and correct.'
+    body: 'Fourteen tables, laid out as a flat grid with very little visual organization. This is the ER diagram as originally published for this database. On its face, it looks complete and correct.'
   },
   {
     title: 'Untangling the diagram',
-    body: "Same tables, same relationships, same symbols as published — just reorganized. Rental is where a customer, an inventory item, and a staff member actually intersect, so it anchors the top. Film, and the geography chain (address to city to country), are branches hanging off other tables, not peers of them. Nothing has been checked or corrected yet — this is just a more readable arrangement of the original claims.",
+    body: "Same tables, same relationships, same symbols as published — just reorganized for clarity. Nothing has been checked or corrected yet — this is just a more readable arrangement of the original claims.",
     pos: treePos, opts: { showSymbols: true }
   },
   {
     title: 'Checking every connector against the live schema',
-    body: 'Rather than trust the diagram, every relationship was checked directly against the actual database — primary keys, foreign keys, and unique constraints, pulled straight from Postgres. Six connectors turned out to be wrong: four around junction tables (film_category, film_actor), and two more (rental&harr;customer, rental&harr;inventory). All six were drawn as "capped at one" when the schema clearly allows many.',
-    pos: treePos, opts: { showSymbols: true, showErrors: true }
+    body: 'Rather than trust the diagram, every relationship was checked directly against the actual database — primary keys, foreign keys, and unique constraints, pulled straight from Postgres. Six connectors in the ERD turned out to be incorrectly stating the relationships hardcoded in the database: four around junction tables (film_category, film_actor) and two others (rental↔customer, rental↔inventory). All six were drawn as "capped at one" when the schema clearly allows many.',
+    pos: treePos, opts: { showSymbols: true, showErrors: true, showInDiagramKey: 'incorrect' }
   },
   {
     title: 'Correcting the symbols',
-    body: 'Each of the six flagged connectors gets its symbol corrected — from "zero-or-one" to "zero-or-many" — matching what the schema actually enforces. Everything else on the diagram was checked too, and left unchanged: most of the original notation is accurate.',
-    pos: treePos, opts: { showSymbols: true, correctedSymbols: true, showErrors: true }
+    body: 'Each of the six flagged connectors gets its symbol corrected — from “zero-or-one” to “zero-or-many” — matching what the schema actually enforces. Everything else on the diagram was checked too, and left unchanged: most of the original notation is accurate.',
+    pos: treePos, opts: { showSymbols: true, correctedSymbols: true, showErrors: true, showInDiagramKey: 'corrected' }
   },
   {
     title: 'The corrected, reorganized schema',
-    body: 'Teal marks every connector verified correct; amber marks the six that needed fixing. The dashed lines are a further discovery, not a correction: staff, inventory, and customer each carry a store_id column with no real foreign key behind it — so the schema allows a staff member, an item, or a customer to point at a store with no constraint enforcing it. This is the version used as reference throughout the four queries that follow.',
-    pos: treePos, opts: { showSymbols: true, correctedSymbols: true, showCorrectColor: true, showPhantom: true }
+    body: 'Teal marks every connector verified as originally correct; amber marks the six that were corrected based on the schema. This is the version used as reference throughout the four queries that follow. A few things this diagram knowingly omits are noted in the caveats section below.',
+    pos: treePos, opts: { showSymbols: true, correctedSymbols: true, showCorrectColor: true, showInDiagramKey: 'both', showCaveats: true }
   }
 ];
 
@@ -386,7 +469,7 @@ function render() {
     svgEl.style.display = 'block';
     draw(s.pos, s.opts);
   }
-  document.querySelector('.legend').style.display = (s.type === 'image') ? 'none' : 'flex';
+  document.querySelector('.caveats').style.display = (s.opts && s.opts.showCaveats) ? 'block' : 'none';
   document.getElementById('panelTitle').textContent = s.title;
   document.getElementById('panelBody').textContent = s.body;
   document.getElementById('stepLabel').textContent = `Step ${stepIdx+1} of ${steps.length}`;
