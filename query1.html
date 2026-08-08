@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Query 1 — Video Store SQL Analysis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg-primary: #FAFAF8;
+    --bg-secondary: #FFFFFF;
+    --text-main: #1A1A18;
+    --text-muted: #666;
+    --border-faint: #E0D8CF;
+    --teal: #2D7D7B;
+    --teal-soft: #DCEBEA;
+    --amber: #B8860B;
+    --amber-soft: #F5E9CE;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-main);
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 3rem 2rem 6rem;
+  }
+  .back-link {
+    font-size: 0.8rem;
+    color: #888;
+    text-decoration: none;
+  }
+  .back-link:hover { text-decoration: underline; }
+
+  .stepper {
+    display: flex;
+    gap: 0.4rem;
+    margin: 1.5rem 0 2.5rem;
+    flex-wrap: wrap;
+  }
+  .stepper span, .stepper-link {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    padding: 0.3rem 0.7rem;
+    border-radius: 20px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-faint);
+    color: var(--text-muted);
+    text-decoration: none;
+  }
+  .stepper span.current {
+    background: var(--teal);
+    color: #fff;
+    border-color: var(--teal);
+    font-weight: 600;
+  }
+  .stepper-link:hover { border-color: var(--teal); color: var(--teal); }
+
+  h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    letter-spacing: -0.01em;
+  }
+  .subtitle {
+    font-size: 1rem;
+    color: var(--text-muted);
+    max-width: 620px;
+    line-height: 1.6;
+    margin-bottom: 2.5rem;
+  }
+
+  .section-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 0.6rem;
+    margin-top: 2.5rem;
+  }
+
+  .card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-faint);
+    border-radius: 16px;
+    padding: 1.75rem;
+  }
+  .card p {
+    font-size: 0.92rem;
+    line-height: 1.7;
+    color: var(--text-main);
+    opacity: 0.85;
+  }
+  .card p + p { margin-top: 0.75rem; }
+
+  .business-question {
+    font-size: 1.05rem;
+    font-weight: 600;
+    line-height: 1.55;
+    opacity: 1 !important;
+    color: var(--text-main);
+  }
+
+  /* Annotated schema */
+  .schema-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.1rem;
+    gap: 1rem;
+  }
+  .schema-note {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+  }
+  .schema-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--teal);
+    background: var(--teal-soft);
+    border: 1px solid rgba(45,125,123,0.35);
+    padding: 0.35rem 0.85rem;
+    border-radius: 8px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s, color 0.15s;
+  }
+  .schema-btn:hover { background: var(--teal); color: #fff; }
+
+  svg { width: 100%; height: auto; display: block; }
+
+  /* Chart */
+  .chart-container {
+    position: relative;
+    height: 380px;
+  }
+
+  /* Key finding */
+  .key-finding {
+    border-left: 3px solid var(--teal);
+    padding-left: 1.25rem;
+  }
+  .key-finding p {
+    font-size: 0.95rem !important;
+    opacity: 1 !important;
+    line-height: 1.75 !important;
+  }
+
+  /* Reasoning */
+  code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82em;
+    background: var(--teal-soft);
+    padding: 0.1em 0.35em;
+    border-radius: 4px;
+  }
+
+  /* SQL collapsible */
+  .sql-details {
+    border: 1px solid var(--border-faint);
+    border-radius: 16px;
+    overflow: hidden;
+    margin-top: 2.5rem;
+  }
+  .sql-details summary {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    padding: 1rem 1.5rem;
+    cursor: pointer;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--bg-secondary);
+  }
+  .sql-details summary::-webkit-details-marker { display: none; }
+  .sql-details summary::before {
+    content: '▶';
+    font-size: 0.6rem;
+    transition: transform 0.2s ease;
+  }
+  .sql-details[open] summary::before { transform: rotate(90deg); }
+  .sql-details summary:hover { color: var(--text-main); }
+  .sql-body {
+    border-top: 1px solid var(--border-faint);
+    background: var(--bg-secondary);
+  }
+  pre {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+    line-height: 1.65;
+    padding: 1.5rem 1.75rem;
+    overflow-x: auto;
+    color: var(--text-main);
+    white-space: pre-wrap;
+  }
+
+  /* Modal */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.48);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-overlay.active { display: flex; }
+  .modal-box {
+    background: var(--bg-primary);
+    border-radius: 16px;
+    width: 92%;
+    max-width: 1100px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.28);
+  }
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.9rem 1.5rem;
+    border-bottom: 1px solid var(--border-faint);
+    background: var(--bg-secondary);
+    flex-shrink: 0;
+  }
+  .modal-header span {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+  .modal-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: 1.1rem;
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    line-height: 1;
+  }
+  .modal-close:hover { color: var(--text-main); background: var(--border-faint); }
+  .modal-scroll {
+    overflow-y: auto;
+    padding: 1.25rem 1.5rem 1.5rem;
+    flex: 1;
+  }
+</style>
+</head>
+<body>
+
+<a class="back-link" href="https://edward-chen.com">&larr; Back to Homepage</a>
+
+<div class="stepper">
+  <a class="stepper-link" href="erd.html">0 &middot; Reading the Schema</a>
+  <span class="current">1 &middot; Query 1</span>
+  <span>2 &middot; Query 2</span>
+  <span>3 &middot; Query 3</span>
+  <span>4 &middot; Query 4</span>
+</div>
+
+<h1>Store vs. Store</h1>
+<p class="subtitle">A category-by-category breakdown of rental revenue between the two stores.</p>
+
+<p class="section-label">Business Question</p>
+<div class="card">
+  <p class="business-question">How much more (or less) did Store 1 generate in rental revenue versus Store 2, in each film category?</p>
+</div>
+
+<p class="section-label">Annotated Schema</p>
+<div class="card">
+  <div class="schema-header">
+    <p class="schema-note">Tables used in this query are highlighted. Others are shown for context.</p>
+    <button class="schema-btn" onclick="openModal()">View full schema &rarr;</button>
+  </div>
+  <svg id="annotated-svg" viewBox="0 0 1200 370" xmlns="http://www.w3.org/2000/svg"></svg>
+</div>
+
+<p class="section-label">Query Output</p>
+<div class="card">
+  <div class="chart-container">
+    <canvas id="q1chart"></canvas>
+  </div>
+</div>
+
+<p class="section-label">Key Finding</p>
+<div class="card">
+  <div class="key-finding">
+    <p>Across the 16 film categories, Store 1 outperformed Store 2 in 7, ranging from a +$485 lead in Drama down to a +$126 lead in Family. Store 2 outperformed Store 1 in the remaining 9, from a narrow -$60 gap in Games down to a -$398 deficit in Documentary. These category-level revenue gaps could inform resource allocation between the two stores, or help a store-level manager make stocking or promotional decisions specific to that location.</p>
+  </div>
+</div>
+
+<p class="section-label">Reasoning</p>
+<div class="card">
+  <p>Revenue on its own is simple &mdash; sum every row in <code>payment</code>. The interesting part is how far that number can be broken apart before the schema stops giving you an easy path.</p>
+  <p style="margin-top:0.75rem">Breaking revenue out by store is a short hop: <code>payment</code> &rarr; <code>rental</code> &rarr; <code>inventory</code> gets you to <code>store_id</code>, one additional join beyond the base aggregation. Breaking it out by film category is a longer one &mdash; <code>category</code> isn&rsquo;t adjacent to revenue at all. It lives off <code>film</code>, connected through the <code>film_category</code> junction table, three joins removed from <code>payment</code> in the opposite direction from store.</p>
+  <p style="margin-top:0.75rem">Combining both breakouts in a single result meant joining six tables &mdash; <code>inventory</code>, <code>rental</code>, <code>payment</code>, <code>film</code>, <code>film_category</code>, <code>category</code> &mdash; to synthesize two dimensions that don&rsquo;t live anywhere near each other in the schema, rather than settling for whichever breakout the table structure made convenient.</p>
+  <p style="margin-top:0.75rem">The comparison itself uses a window function rather than a self-join. After grouping by category and store, each category has exactly two rows &mdash; one per store. <code>LEAD()</code>, partitioned by category and ordered by store, pulls Store 2&rsquo;s revenue directly into Store 1&rsquo;s row within that two-row partition, so the difference can be calculated without ever joining the aggregated result back to itself.</p>
+</div>
+
+<details class="sql-details">
+  <summary>Query 1 &mdash; SQL</summary>
+  <div class="sql-body">
+<pre>/* table1 creates a table of every combination of film category and store_id.  It then uses an aggregation to create a column of the total rental revenue (sum of payment.amount) for each film category and store_id combination.  It then uses a Window Function to create a column to help compare store1 revenue versus store2 revenue for each film category.  Lastly, it creates a column representing the difference in store1 versus store2 revenue for each film category and store_id combination. */
+WITH table1 AS (
+SELECT c.name AS category_name,
+       i.store_id,
+       SUM (p.amount) AS rental_revenue,
+       LEAD (SUM (p.amount)) OVER (PARTITION BY c.name ORDER BY i.store_id) AS next_store_rental_revenue,
+       (SUM (p.amount)) - (LEAD (SUM (p.amount)) OVER (PARTITION BY c.name ORDER BY i.store_id)) AS store_rental_revenue_difference
+  FROM inventory i
+  JOIN rental r
+    ON i.inventory_id = r.inventory_id
+  JOIN payment p
+    ON r.rental_id = p.rental_id
+  JOIN film f
+    ON f.film_id = i.film_id
+  JOIN film_category fc
+    ON fc.film_id = f.film_id
+  JOIN category c
+    ON fc.category_id = c.category_id
+ GROUP BY 1, 2
+ ORDER BY 1, 2
+)
+
+/* the output table cleans up table1 so that you are left with a column of category names and a second column representing the difference in rental revenue between store1 and store2 for each category.  A positive difference in rental revenue represents a category where store1 outperformed store2.  A negative difference in rental revenue represents a category where store1 underperformed store2. */
+SELECT category_name,
+       store_rental_revenue_difference
+  FROM table1
+ WHERE store_rental_revenue_difference IS NOT NULL
+ ORDER BY 2 DESC;</pre>
+  </div>
+</details>
+
+<!-- Modal for full corrected schema -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span>Full corrected schema</span>
+      <button class="modal-close" onclick="closeModal()">&#x2715;</button>
+    </div>
+    <div class="modal-scroll">
+      <svg id="modal-svg" viewBox="0 0 1200 1060" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;"></svg>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── ERD drawing engine (shared with erd.html) ──────────────────────────────
+const TW = 126;
+const SYM_D2 = 16;
+function symOuter(code) { return code === '1' ? 24 : SYM_D2; }
+const HEADER_H = 26;
+const COL_H    = 15;
+const BODY_PAD = 6;
+
+const tables = {
+  category:      { label: 'category',      cols: ['* category_id', 'name'] },
+  film_category: { label: 'film_category',  cols: ['* film_id', '* category_id'] },
+  film:          { label: 'film',           cols: ['* film_id', 'title', 'description', 'release_year', 'rental_duration', 'rental_rate', 'length', 'replacement_cost', 'rating', 'fulltext'] },
+  film_actor:    { label: 'film_actor',     cols: ['* actor_id', '* film_id'] },
+  actor:         { label: 'actor',          cols: ['* actor_id', 'first_name', 'last_name'] },
+  language:      { label: 'language',       cols: [] },
+  inventory:     { label: 'inventory',      cols: ['* inventory_id', 'film_id', 'store_id'] },
+  rental:        { label: 'rental',         cols: ['* rental_id', 'rental_date', 'inventory_id', 'customer_id', 'return_date', 'staff_id'] },
+  payment:       { label: 'payment',        cols: ['* payment_id', 'customer_id', 'staff_id', 'rental_id', 'amount', 'payment_date'] },
+  customer:      { label: 'customer',       cols: ['* customer_id', 'store_id', 'first_name', 'last_name', 'email', 'address_id', 'activebool', 'create_date', 'active'] },
+  staff:         { label: 'staff',          cols: ['* staff_id', 'first_name', 'last_name', 'address_id', 'email', 'store_id', 'active', 'username', 'password', 'picture'] },
+  store:         { label: 'store',          cols: ['* store_id', 'manager_staff_id', 'address_id'] },
+  address:       { label: 'address',        cols: ['* address_id', 'address', 'address2', 'district', 'city_id', 'postal_code', 'phone'] },
+  city:          { label: 'city',           cols: ['* city_id', 'city', 'country_id'] },
+  country:       { label: 'country',        cols: ['* country_id', 'country'] },
+};
+
+const treePos = {
+  rental:        { x: 537, y: 20  },
+  inventory:     { x: 125, y: 276 },
+  store:         { x: 331, y: 276 },
+  staff:         { x: 537, y: 276 },
+  payment:       { x: 743, y: 276 },
+  customer:      { x: 949, y: 276 },
+  film:          { x: 125, y: 435 },
+  address:       { x: 640, y: 545 },
+  film_category: { x: 42,  y: 692 },
+  film_actor:    { x: 208, y: 692 },
+  city:          { x: 640, y: 754 },
+  category:      { x: 42,  y: 836 },
+  actor:         { x: 208, y: 836 },
+  country:       { x: 640, y: 903 },
+};
+
+const conns = [
+  ['film_category','category', 'z1','1', true,  { from:'bottom', to:'top'          }],
+  ['film_category','film',     'z1','1', true,  { from:'top',    to:'bottom-left'  }],
+  ['film_actor',  'film',      'z1','1', true,  { from:'top',    to:'bottom-right' }],
+  ['film_actor',  'actor',     'z1','1', true,  { from:'bottom', to:'top'          }],
+  ['inventory',   'film',      'zM','1', false, { from:'bottom', to:'top'          }],
+  ['rental',      'inventory', 'z1','1', true,  { from:'left',   to:'top'          }],
+  ['rental',      'customer',  'z1','1', true,  { from:'right',  to:'top'          }],
+  ['rental',      'staff',     'zM','1', false, { from:'bottom', to:'top'          }],
+  ['payment',     'rental',    'zM','1', false, { from:'top',    to:'bottom-right' }],
+  ['payment',     'customer',  'zM','1', false, { from:'right',  to:'left',  yRef:['store','right'], yOffset:10 }],
+  ['payment',     'staff',     'zM','1', false, { from:'left',   to:'right', yRef:['store','right'], yOffset:10 }],
+  ['store',       'staff',     'z1','1', false, { from:'right',  to:'left',  yRef:['store','right'], yOffset:10 }],
+  ['customer',    'address',   'zM','1', false, { from:'bottom', to:'right'        }],
+  ['staff',       'address',   'zM','1', false, { from:'bottom-right', to:'top'    }],
+  ['store',       'address',   'zM','1', false, { from:'bottom', to:'left'         }],
+  ['address',     'city',      'zM','1', false, { from:'bottom', to:'top'          }],
+  ['city',        'country',   'zM','1', false, { from:'bottom', to:'top'          }],
+];
+
+function tableHeight(id) {
+  return HEADER_H + 1 + tables[id].cols.length * COL_H + BODY_PAD;
+}
+
+function edgePt(pos, id, side, fixedY) {
+  const p = pos[id];
+  const h = tableHeight(id);
+  const midY = fixedY !== undefined ? fixedY : p.y + h / 2;
+  if (side === 'left')         return { x: p.x,        y: midY };
+  if (side === 'right')        return { x: p.x + TW,   y: midY };
+  if (side === 'top')          return { x: p.x + TW/2, y: p.y };
+  if (side === 'bottom')       return { x: p.x + TW/2, y: p.y + h };
+  if (side === 'bottom-right') return { x: p.x + TW,   y: p.y + h };
+  if (side === 'bottom-left')  return { x: p.x,        y: p.y + h };
+  const cx = p.x + TW/2, cy = p.y + h/2;
+  return { x: cx, y: cy };
+}
+
+function sideNormal(side) {
+  const s = 1 / Math.sqrt(2);
+  return {
+    'top':          [  0, -1 ],
+    'bottom':       [  0,  1 ],
+    'left':         [ -1,  0 ],
+    'right':        [  1,  0 ],
+    'top-left':     [ -s, -s ],
+    'top-right':    [  s, -s ],
+    'bottom-left':  [ -s,  s ],
+    'bottom-right': [  s,  s ],
+  }[side] || null;
+}
+
+function notation(x, y, dx, dy, code, color, strokeWidth) {
+  strokeWidth = strokeWidth || 1.5;
+  const px = -dy, py = dx;
+  const T = 6, D1 = 8, D2 = SYM_D2, S = 6;
+  const outerD = symOuter(code);
+  const isDiag = Math.abs(dx) > 0.1 && Math.abs(dy) > 0.1;
+  const inset = isDiag ? 2 : 0;
+  const bx = x - dx*inset, by = y - dy*inset;
+
+  let g = `<g stroke="${color}" stroke-width="${strokeWidth}" fill="none">`;
+  g += `<line x1="${x+dx*outerD}" y1="${y+dy*outerD}" x2="${bx}" y2="${by}"/>`;
+  if (code === 'zM') {
+    const ax = x + dx*D1, ay = y + dy*D1;
+    g += `<line x1="${ax}" y1="${ay}" x2="${bx-px*S}" y2="${by-py*S}"/>`;
+    g += `<line x1="${ax}" y1="${ay}" x2="${bx}"      y2="${by}"/>`;
+    g += `<line x1="${ax}" y1="${ay}" x2="${bx+px*S}" y2="${by+py*S}"/>`;
+    g += `<circle cx="${x+dx*D2}" cy="${y+dy*D2}" r="3" fill="white"/>`;
+  } else if (code === '1') {
+    g += `<line x1="${x+dx*D1-px*T}" y1="${y+dy*D1-py*T}" x2="${x+dx*D1+px*T}" y2="${y+dy*D1+py*T}"/>`;
+    g += `<line x1="${x+dx*D2-px*T}" y1="${y+dy*D2-py*T}" x2="${x+dx*D2+px*T}" y2="${y+dy*D2+py*T}"/>`;
+  } else if (code === 'z1') {
+    g += `<line x1="${x+dx*D1-px*T}" y1="${y+dy*D1-py*T}" x2="${x+dx*D1+px*T}" y2="${y+dy*D1+py*T}"/>`;
+    g += `<circle cx="${x+dx*D2}" cy="${y+dy*D2}" r="3" fill="white"/>`;
+  }
+  return g + `</g>`;
+}
+
+function draw(pos, opts, targetEl) {
+  opts = opts || {};
+  let svgContent = '';
+
+  conns.forEach(([from, to, symFrom, symTo, wrong, route]) => {
+    if (!pos[from] || !pos[to]) return;
+    const fixedY = (route && route.yRef) ? edgePt(pos, route.yRef[0], route.yRef[1]).y + (route.yOffset || 0) : undefined;
+    const a = route ? edgePt(pos, from, route.from, fixedY) : { x: pos[from].x + TW/2, y: pos[from].y + tableHeight(from)/2 };
+    const b = route ? edgePt(pos, to,   route.to,   fixedY) : { x: pos[to].x   + TW/2, y: pos[to].y   + tableHeight(to)/2   };
+    let cls = 'conn';
+    let symFromShown = symFrom, symToShown = symTo;
+    if (opts.showErrors && wrong) cls += ' wrong';
+    if (opts.correctedSymbols && wrong) { symFromShown = 'zM'; }
+    if (opts.showCorrectColor) cls += wrong ? ' wrong' : ' correct';
+
+    const dist = Math.sqrt((b.x-a.x)**2 + (b.y-a.y)**2);
+    const ux = (b.x-a.x)/dist, uy = (b.y-a.y)/dist;
+    const fromN = route && sideNormal(route.from);
+    const toN   = route && sideNormal(route.to);
+    const adx = fromN ? fromN[0] :  ux, ady = fromN ? fromN[1] :  uy;
+    const bdx = toN   ? toN[0]   : -ux, bdy = toN   ? toN[1]   : -uy;
+
+    const aOuter = symOuter(symFromShown);
+    const bOuter = symOuter(symToShown);
+    const strokeColor = cls.includes('wrong') ? (opts.showCorrectColor ? '#B8860B' : '#B8860B') : cls.includes('correct') ? '#2D7D7B' : '#999';
+    const strokeW     = cls.includes('wrong') ? 2 : 1.5;
+    svgContent += `<line stroke="${strokeColor}" stroke-width="${strokeW}" fill="none" x1="${a.x+adx*aOuter}" y1="${a.y+ady*aOuter}" x2="${b.x+bdx*bOuter}" y2="${b.y+bdy*bOuter}"/>`;
+
+    if (opts.showSymbols) {
+      const isUncorrectedWrong = cls.includes('wrong') && !opts.showCorrectColor;
+      let fromColor, toColor, fromStroke;
+      if (cls.includes('correct')) {
+        fromColor = toColor = '#2D7D7B'; fromStroke = 1.5;
+      } else if (cls.includes('wrong')) {
+        fromColor = '#B8860B';
+        toColor   = isUncorrectedWrong ? '#999' : '#2D7D7B';
+        fromStroke = isUncorrectedWrong ? 2.5 : 1.5;
+      } else {
+        fromColor = toColor = '#999'; fromStroke = 1.5;
+      }
+      svgContent += notation(a.x, a.y, adx, ady, symFromShown, fromColor, fromStroke);
+      svgContent += notation(b.x, b.y, bdx, bdy, symToShown,   toColor,   1.5);
+    }
+  });
+
+  Object.keys(tables).filter(id => pos[id]).forEach(id => {
+    const t = tables[id];
+    const p = pos[id];
+    const h = tableHeight(id);
+    svgContent += `<g>
+      <rect x="${p.x}" y="${p.y}" width="${TW}" height="${h}" rx="6" fill="white" stroke="#E0D8CF" stroke-width="1.5"/>
+      <text font-family="JetBrains Mono, monospace" font-weight="600" font-size="11" fill="#1A1A18" x="${p.x + TW/2}" y="${p.y + HEADER_H/2 + 4}" text-anchor="middle">${t.label}</text>
+      <line x1="${p.x}" y1="${p.y + HEADER_H}" x2="${p.x + TW}" y2="${p.y + HEADER_H}" stroke="#E0D8CF" stroke-width="1"/>`;
+    t.cols.forEach((col, i) => {
+      const cy = p.y + HEADER_H + BODY_PAD + i * COL_H + 10;
+      const isPK = col.startsWith('* ');
+      svgContent += `<text font-family="JetBrains Mono, monospace" font-size="10" fill="${isPK ? '#1A1A18' : '#888'}" font-weight="${isPK ? '600' : '400'}" x="${p.x + 8}" y="${cy}">${col}</text>`;
+    });
+    svgContent += `</g>`;
+  });
+
+  if (opts.showSymbolKey) {
+    const tableX = 62, yBase = 994, rowH = 24;
+    [{ code:'zM', label:'Zero or many' },{ code:'z1', label:'Zero or one' },{ code:'1', label:'Exactly one' }].forEach(({ code, label }, i) => {
+      const y = yBase + i * rowH;
+      if (code !== '1') {
+        svgContent += `<line stroke="#999" stroke-width="1.5" x1="${tableX - symOuter(code) - 8}" y1="${y}" x2="${tableX - symOuter(code)}" y2="${y}"/>`;
+      }
+      svgContent += notation(tableX, y, -1, 0, code, '#999');
+      svgContent += `<text font-family="JetBrains Mono, monospace" font-size="10" fill="#555" x="${tableX + 12}" y="${y + 4}">${label}</text>`;
+    });
+  }
+
+  if (opts.showInDiagramKey) {
+    if (opts.showInDiagramKey === 'both') {
+      svgContent += `<circle cx="175" cy="994" r="5" fill="#B8860B"/>
+      <text font-family="JetBrains Mono, monospace" font-size="11" fill="#666" x="187" y="998">Corrected connector</text>
+      <circle cx="175" cy="1018" r="5" fill="#2D7D7B"/>
+      <text font-family="JetBrains Mono, monospace" font-size="11" fill="#666" x="187" y="1022">Originally correct</text>`;
+    } else {
+      const label = opts.showInDiagramKey === 'corrected' ? 'Corrected connector' : 'Incorrect connector';
+      svgContent += `<circle cx="175" cy="994" r="5" fill="#B8860B"/>
+      <text font-family="JetBrains Mono, monospace" font-size="11" fill="#666" x="187" y="998">${label}</text>`;
+    }
+  }
+
+  targetEl.innerHTML = svgContent;
+}
+
+// ── Annotated schema (name-only boxes, compressed layout) ──────────────────
+const QUERY1_TABLES = new Set(['category','film_category','film','inventory','rental','payment']);
+
+const annotatedPos = {
+  rental:        { x: 537, y: 20  },
+  inventory:     { x: 125, y: 93  },
+  store:         { x: 331, y: 93  },
+  staff:         { x: 537, y: 93  },
+  payment:       { x: 743, y: 93  },
+  customer:      { x: 949, y: 93  },
+  film:          { x: 125, y: 166 },
+  address:       { x: 640, y: 166 },
+  film_category: { x: 42,  y: 239 },
+  film_actor:    { x: 208, y: 239 },
+  city:          { x: 640, y: 239 },
+  category:      { x: 42,  y: 312 },
+  actor:         { x: 208, y: 312 },
+  country:       { x: 640, y: 312 },
+};
+const ANNOT_H = 33;
+
+function annotEdgePt(id, side, fixedY) {
+  const p = annotatedPos[id];
+  if (!p) return null;
+  const midY = fixedY !== undefined ? fixedY : p.y + ANNOT_H / 2;
+  if (side === 'left')         return { x: p.x,        y: midY };
+  if (side === 'right')        return { x: p.x + TW,   y: midY };
+  if (side === 'top')          return { x: p.x + TW/2, y: p.y };
+  if (side === 'bottom')       return { x: p.x + TW/2, y: p.y + ANNOT_H };
+  if (side === 'bottom-right') return { x: p.x + TW,   y: p.y + ANNOT_H };
+  if (side === 'bottom-left')  return { x: p.x,        y: p.y + ANNOT_H };
+  return { x: p.x + TW/2, y: p.y + ANNOT_H/2 };
+}
+
+function drawAnnotated() {
+  const svgEl = document.getElementById('annotated-svg');
+  let html = '';
+
+  // Connectors first
+  conns.forEach(([from, to, , , , route]) => {
+    if (!annotatedPos[from] || !annotatedPos[to]) return;
+    const isHL = QUERY1_TABLES.has(from) && QUERY1_TABLES.has(to);
+
+    let fixedY = undefined;
+    if (route && route.yRef) {
+      const refPt = annotEdgePt(route.yRef[0], route.yRef[1]);
+      if (refPt) fixedY = refPt.y + (route.yOffset || 0);
+    }
+
+    const a = route ? annotEdgePt(from, route.from, fixedY) : { x: annotatedPos[from].x + TW/2, y: annotatedPos[from].y + ANNOT_H/2 };
+    const b = route ? annotEdgePt(to,   route.to,   fixedY) : { x: annotatedPos[to].x   + TW/2, y: annotatedPos[to].y   + ANNOT_H/2 };
+    if (!a || !b) return;
+
+    const stroke = isHL ? '#2D7D7B' : '#D8D0C8';
+    const sw     = isHL ? 2 : 1;
+    const opacity = isHL ? 1 : 0.6;
+    html += `<line stroke="${stroke}" stroke-width="${sw}" opacity="${opacity}" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"/>`;
+  });
+
+  // Table boxes on top
+  Object.keys(tables).filter(id => annotatedPos[id]).forEach(id => {
+    const p = annotatedPos[id];
+    const isHL = QUERY1_TABLES.has(id);
+    if (isHL) {
+      html += `<rect x="${p.x}" y="${p.y}" width="${TW}" height="${ANNOT_H}" rx="5" fill="#2D7D7B" stroke="#2D7D7B" stroke-width="1.5"/>
+        <text font-family="JetBrains Mono, monospace" font-size="11" font-weight="600" fill="white" x="${p.x + TW/2}" y="${p.y + ANNOT_H/2 + 4}" text-anchor="middle">${tables[id].label}</text>`;
+    } else {
+      html += `<g opacity="0.38">
+        <rect x="${p.x}" y="${p.y}" width="${TW}" height="${ANNOT_H}" rx="5" fill="#F0EDE9" stroke="#C8C0B8" stroke-width="1"/>
+        <text font-family="JetBrains Mono, monospace" font-size="11" fill="#555" x="${p.x + TW/2}" y="${p.y + ANNOT_H/2 + 4}" text-anchor="middle">${tables[id].label}</text>
+      </g>`;
+    }
+  });
+
+  svgEl.innerHTML = html;
+}
+
+// ── Modal ──────────────────────────────────────────────────────────────────
+let modalRendered = false;
+
+function openModal() {
+  if (!modalRendered) {
+    draw(treePos,
+      { showSymbols: true, correctedSymbols: true, showCorrectColor: true, showInDiagramKey: 'both', showSymbolKey: true },
+      document.getElementById('modal-svg')
+    );
+    modalRendered = true;
+  }
+  document.getElementById('modalOverlay').classList.add('active');
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('active');
+}
+
+document.getElementById('modalOverlay').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+// ── Chart ──────────────────────────────────────────────────────────────────
+const chartLabels = ['Drama','New','Comedy','Foreign','Action','Music','Family','Games','Animation','Children','Travel','Classics','Sports','Sci-Fi','Horror','Documentary'];
+const chartData   = [485.24, 466.30, 336.44, 259.89, 227.30, 162.58, 125.75, -60.44, -107.67, -159.59, -182.64, -207.56, -316.33, -325.45, -360.33, -397.71];
+
+new Chart(document.getElementById('q1chart'), {
+  type: 'bar',
+  data: {
+    labels: chartLabels,
+    datasets: [{
+      data: chartData,
+      backgroundColor: '#8FBFBD',
+      borderColor:     '#6AADAB',
+      borderWidth: 1,
+      borderRadius: 4,
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    layout: { padding: { right: 24 } },
+    plugins: {
+      legend: { display: false },
+      title: {
+        display: true,
+        text: 'Rental Revenue Performance Difference by Film Category - Store 1 vs. Store 2',
+        font: { family: 'DM Sans', size: 13, weight: '600' },
+        color: '#1A1A18',
+        padding: { bottom: 16 },
+      },
+      tooltip: {
+        callbacks: {
+          label: ctx => {
+            const v = ctx.parsed.y;
+            return (v >= 0 ? 'Store 1 +$' : 'Store 2 +$') + Math.abs(v).toFixed(2);
+          }
+        },
+        titleFont: { family: 'JetBrains Mono' },
+        bodyFont:  { family: 'JetBrains Mono' },
+      }
+    },
+    scales: {
+      x: {
+        ticks: {
+          font: { family: 'JetBrains Mono', size: 10 },
+          maxRotation: 45,
+          minRotation: 45,
+          color: '#666',
+        },
+        grid: { display: false },
+        border: { color: '#E0D8CF' },
+        afterFit(scale) { scale.height += 20; },
+      },
+      y: {
+        title: {
+          display: true,
+          text: 'Revenue Difference',
+          font: { family: 'DM Sans', size: 11 },
+          color: '#666',
+          padding: { bottom: 6 },
+        },
+        ticks: {
+          font: { family: 'JetBrains Mono', size: 10 },
+          color: '#666',
+          callback: v => (v >= 0 ? '+$' : '-$') + Math.abs(v),
+        },
+        grid: { color: '#F0EDE9' },
+        border: { color: '#E0D8CF' },
+      }
+    }
+  }
+});
+
+// ── Init ───────────────────────────────────────────────────────────────────
+drawAnnotated();
+</script>
+
+</body>
+</html>

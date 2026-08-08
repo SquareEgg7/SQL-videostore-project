@@ -54,6 +54,17 @@
     border-color: var(--teal);
     font-weight: 600;
   }
+  .stepper-link {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    padding: 0.3rem 0.7rem;
+    border-radius: 20px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-faint);
+    color: var(--text-muted);
+    text-decoration: none;
+  }
+  .stepper-link:hover { border-color: var(--teal); color: var(--teal); }
 
   h1 {
     font-size: 2rem;
@@ -216,11 +227,11 @@
 </head>
 <body>
 
-  <a class="back-link" href="#">&larr; Back to Homepage</a>
+  <a class="back-link" href="https://edward-chen.com">&larr; Back to Homepage</a>
 
   <div class="stepper">
     <span class="current">0 &middot; Reading the Schema</span>
-    <span>1 &middot; Query 1</span>
+    <a class="stepper-link" href="query1.html">1 &middot; Query 1</a>
     <span>2 &middot; Query 2</span>
     <span>3 &middot; Query 3</span>
     <span>4 &middot; Query 4</span>
