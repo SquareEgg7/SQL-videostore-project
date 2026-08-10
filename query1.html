@@ -651,7 +651,7 @@ let modalRendered = false;
 function openModal() {
   if (!modalRendered) {
     draw(treePos,
-      { showSymbols: true, correctedSymbols: true, showCorrectColor: true, showInDiagramKey: 'both', showSymbolKey: true },
+      { showSymbols: true, correctedSymbols: true, showSymbolKey: true },
       document.getElementById('modal-svg')
     );
     modalRendered = true;
