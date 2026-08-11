@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Query 1 — Video Store SQL Analysis</title>
+<title>Query 3 — Video Store SQL Analysis</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -287,18 +287,18 @@
 
 <div class="stepper">
   <a class="stepper-link" href="erd.html">0 &middot; Reading the Schema</a>
-  <span class="current">1 &middot; Query 1</span>
+  <a class="stepper-link" href="query1.html">1 &middot; Query 1</a>
   <a class="stepper-link" href="query2.html">2 &middot; Query 2</a>
-  <a class="stepper-link" href="query3.html">3 &middot; Query 3</a>
+  <span class="current">3 &middot; Query 3</span>
   <span>4 &middot; Query 4</span>
 </div>
 
-<h1>Store vs. Store</h1>
-<p class="subtitle">A category-by-category breakdown of rental revenue between the two stores.</p>
+<h1>Short Films by Country</h1>
+<p class="subtitle">Which countries&rsquo; customers lean most heavily toward the shortest quartile of films, and by how much.</p>
 
 <p class="section-label">Business Question</p>
 <div class="card">
-  <p class="business-question">How much more (or less) did Store 1 generate in rental revenue versus Store 2, in each film category?</p>
+  <p class="business-question">What percent of each country&rsquo;s total rentals are represented by films in the shortest quartile (by length). Show only the top 10 countries.</p>
 </div>
 
 <p class="section-label">Annotated Schema</p>
@@ -316,56 +316,78 @@
 <p class="section-label">Query Output</p>
 <div class="card">
   <div class="chart-container">
-    <canvas id="q1chart"></canvas>
+    <canvas id="q3chart"></canvas>
   </div>
 </div>
 
 <p class="section-label">Key Finding</p>
 <div class="card">
   <div class="key-finding">
-    <p>Across the 16 film categories, Store 1 outperformed Store 2 in 7, ranging from a +$485 lead in Drama down to a +$126 lead in Family. Store 2 outperformed Store 1 in the remaining 9, from a narrow -$60 gap in Games down to a -$398 deficit in Documentary. These category-level revenue gaps could inform resource allocation between the two stores, or help a store-level manager make stocking or promotional decisions specific to that location.</p>
+    <p>Among the ten countries with the highest share of short-film rentals, French Guiana leads &mdash; over 40% of the movies its customers rented fall in the shortest quartile by length, the only country above 40%. Malawi (39.3%) and Ethiopia (39.1%) follow closely, with the remaining seven ranging down to Liechtenstein at 32.1%.</p>
   </div>
 </div>
 
 <p class="section-label">Reasoning</p>
 <div class="card">
-  <p>Revenue on its own is simple &mdash; sum every row in <code>payment</code>. The interesting part is how far that number can be broken apart before the schema stops giving you an easy path.</p>
-  <p style="margin-top:0.75rem">Breaking revenue out by store is a short hop: <code>payment</code> &rarr; <code>rental</code> &rarr; <code>inventory</code> gets you to <code>store_id</code>, one additional join beyond the base aggregation. Breaking it out by film category is a longer one &mdash; <code>category</code> isn&rsquo;t adjacent to revenue at all. It lives off <code>film</code>, connected through the <code>film_category</code> junction table, three joins removed from <code>payment</code> in the opposite direction from store.</p>
-  <p style="margin-top:0.75rem">Combining both breakouts in a single result meant joining six tables &mdash; <code>inventory</code>, <code>rental</code>, <code>payment</code>, <code>film</code>, <code>film_category</code>, <code>category</code> &mdash; to synthesize two dimensions that don&rsquo;t live anywhere near each other in the schema, rather than settling for whichever breakout the table structure made convenient.</p>
-  <p style="margin-top:0.75rem">The comparison itself uses a window function rather than a self-join. After grouping by category and store, each category has exactly two rows &mdash; one per store. <code>LEAD()</code>, partitioned by category and ordered by store, pulls Store 2&rsquo;s revenue directly into Store 1&rsquo;s row within that two-row partition, so the difference can be calculated without ever joining the aggregated result back to itself.</p>
+  <p>Geography is really the only rich way to segment customers this database supports directly &mdash; there&rsquo;s no age, income, or account-tenure data to profile individuals against. So the question became: given geography as the available lens, what&rsquo;s a behavioral signal worth measuring across it? Film <code>length</code> seemed like a reasonable proxy for viewing preference &mdash; do customers in some countries lean toward shorter films than others?</p>
+  <p style="margin-top:0.75rem">Defining &ldquo;short&rdquo; needed an objective cutoff rather than an arbitrary one (e.g., &ldquo;under 60 minutes&rdquo;), so <code>NTILE(4)</code>, applied to every film ordered by <code>length</code>, splits the catalog into even quartiles &mdash; the shortest 25% of films by count become quartile 1. Worth noting: film <code>length</code> in this dataset turns out to be close to evenly distributed from 46 to 185 minutes, with no natural clustering around any particular runtime &mdash; so the quartile cutoff (80 minutes) isn&rsquo;t marking a distinct &ldquo;short film&rdquo; category so much as a clean, rank-based 25% line through an otherwise smooth spread.</p>
+  <p style="margin-top:0.75rem">That film-level quartile gets tied to individual rentals through a <code>CASE WHEN ... IN (...)</code> subquery: for each rental, check whether its film&rsquo;s ID appears in the pre-computed list of quartile-1 film IDs, and flag it with a 1 if so. From there, it&rsquo;s a straightforward ratio per country &mdash; count of short-film rentals divided by total rentals, as a percentage &mdash; sorted to surface the top 10.</p>
 </div>
 
 <details class="sql-details">
-  <summary>Query 1 &mdash; SQL</summary>
+  <summary>Query 3 &mdash; SQL</summary>
   <div class="sql-body">
-<pre>/* table1 creates a table of every combination of film category and store_id.  It then uses an aggregation to create a column of the total rental revenue (sum of payment.amount) for each film category and store_id combination.  It then uses a Window Function to create a column to help compare store1 revenue versus store2 revenue for each film category.  Lastly, it creates a column representing the difference in store1 versus store2 revenue for each film category and store_id combination. */
+<pre>/*
+
+Query 3 - Query used for Slide 3
+
+Question: What percent of each country's total rentals are represented by films in the shortest quartile (by length).  Show only the top 10 countries.
+
+*/
+
+/* table1 creates table of each rental_id, the country of its customer, its film_id, and whether that film was in the shortest quartile (by length), or not.  It uses a Window Function to determine films in the shortest quartile, and then uses as CASE WHEN statement to put a '1' in column &lsquo;short&rsquo; if the film is in the shortest quartile.  Otherwise, it leaves the column null. */
 WITH table1 AS (
-SELECT c.name AS category_name,
-       i.store_id,
-       SUM (p.amount) AS rental_revenue,
-       LEAD (SUM (p.amount)) OVER (PARTITION BY c.name ORDER BY i.store_id) AS next_store_rental_revenue,
-       (SUM (p.amount)) - (LEAD (SUM (p.amount)) OVER (PARTITION BY c.name ORDER BY i.store_id)) AS store_rental_revenue_difference
-  FROM inventory i
+SELECT country,
+       rental_id,
+       f.film_id,
+       CASE WHEN i.film_id IN (
+
+/* This subquery creates a table of film_id&rsquo;s for the shortest quartile of films (by length) */
+                               SELECT film_id
+                                 FROM (
+                                       SELECT f.film_id,
+                                              f.length,
+                                              NTILE (4) OVER (ORDER BY f.length) AS length_quartile
+                                         FROM film f
+                                        )sub1
+                                 WHERE length_quartile = 1
+                               ) THEN '1' END AS short
+
+  FROM country c
+  JOIN city c2
+    ON c.country_id = c2.country_id
+  JOIN address a
+    ON c2.city_id = a.city_id
+  JOIN customer c3
+    ON a.address_id = c3.address_id
   JOIN rental r
-    ON i.inventory_id = r.inventory_id
-  JOIN payment p
-    ON r.rental_id = p.rental_id
+    ON c3.customer_id = r.customer_id
+  JOIN inventory i
+    ON r.inventory_id = i.inventory_id
   JOIN film f
-    ON f.film_id = i.film_id
-  JOIN film_category fc
-    ON fc.film_id = f.film_id
-  JOIN category c
-    ON fc.category_id = c.category_id
- GROUP BY 1, 2
- ORDER BY 1, 2
+    ON i.film_id = f.film_id
+ ORDER BY 1
 )
 
-/* the output table cleans up table1 so that you are left with a column of category names and a second column representing the difference in rental revenue between store1 and store2 for each category.  A positive difference in rental revenue represents a category where store1 outperformed store2.  A negative difference in rental revenue represents a category where store1 underperformed store2. */
-SELECT category_name,
-       store_rental_revenue_difference
+/* The output table uses an aggregation to group table1 by country, sums the number of rentals in the shortest quartile, sums the number of total rentals, and calculates the ratio of rentals in the shortest quartile to total rentals.  It is ordered by this ratio, from highest to lowest, showing only the top 10 countries. */
+SELECT country,
+       COUNT (short) AS short_count,
+       COUNT (rental_id) AS rental_count,
+       CAST (COUNT (short) as FLOAT) / (COUNT (rental_id)) * 100 AS percent_of_rentals_in_shortest_quartile
   FROM table1
- WHERE store_rental_revenue_difference IS NOT NULL
- ORDER BY 2 DESC;</pre>
+ GROUP BY 1
+ ORDER BY 4 DESC
+ LIMIT 10;</pre>
   </div>
 </details>
 
@@ -383,7 +405,7 @@ SELECT category_name,
 </div>
 
 <script>
-// ── ERD drawing engine (shared with erd.html) ──────────────────────────────
+// ── ERD drawing engine (shared with erd.html / query1.html / query2.html) ──
 const TW = 126;
 const SYM_D2 = 16;
 function symOuter(code) { return code === '1' ? 24 : SYM_D2; }
@@ -595,7 +617,7 @@ function draw(pos, opts, targetEl) {
 }
 
 // ── Annotated schema (name-only boxes, compressed layout) ──────────────────
-const QUERY1_TABLES = new Set(['category','film_category','film','inventory','rental','payment']);
+const QUERY3_TABLES = new Set(['country','city','address','customer','rental','inventory','film']);
 
 const annotatedPos = {
   rental:        { x: 537, y: 20  },
@@ -635,7 +657,7 @@ function drawAnnotated() {
   // Connectors first
   conns.forEach(([from, to, , , , route]) => {
     if (!annotatedPos[from] || !annotatedPos[to]) return;
-    const isHL = QUERY1_TABLES.has(from) && QUERY1_TABLES.has(to);
+    const isHL = QUERY3_TABLES.has(from) && QUERY3_TABLES.has(to);
 
     let fixedY = undefined;
     if (route && route.yRef) {
@@ -656,7 +678,7 @@ function drawAnnotated() {
   // Table boxes on top
   Object.keys(tables).filter(id => annotatedPos[id]).forEach(id => {
     const p = annotatedPos[id];
-    const isHL = QUERY1_TABLES.has(id);
+    const isHL = QUERY3_TABLES.has(id);
     if (isHL) {
       html += `<rect x="${p.x}" y="${p.y}" width="${TW}" height="${ANNOT_H}" rx="5" fill="#2D7D7B" stroke="#2D7D7B" stroke-width="1.5"/>
         <text font-family="JetBrains Mono, monospace" font-size="11" font-weight="600" fill="white" x="${p.x + TW/2}" y="${p.y + ANNOT_H/2 + 4}" text-anchor="middle">${tables[id].label}</text>`;
@@ -694,10 +716,10 @@ document.getElementById('modalOverlay').addEventListener('click', function(e) {
 });
 
 // ── Chart ──────────────────────────────────────────────────────────────────
-const chartLabels = ['Drama','New','Comedy','Foreign','Action','Music','Family','Games','Animation','Children','Travel','Classics','Sports','Sci-Fi','Horror','Documentary'];
-const chartData   = [485.24, 466.30, 336.44, 259.89, 227.30, 162.58, 125.75, -60.44, -107.67, -159.59, -182.64, -207.56, -316.33, -325.45, -360.33, -397.71];
+const chartLabels = ['French Guiana','Malawi','Ethiopia','Virgin Islands, U.S.','Bolivia','Tanzania','Chad','Malaysia','Kazakstan','Liechtenstein'];
+const chartData   = [40.91, 39.29, 39.13, 37.5, 36.17, 34.94, 34.38, 34.12, 32.69, 32.14];
 
-new Chart(document.getElementById('q1chart'), {
+new Chart(document.getElementById('q3chart'), {
   type: 'bar',
   data: {
     labels: chartLabels,
@@ -717,17 +739,14 @@ new Chart(document.getElementById('q1chart'), {
       legend: { display: false },
       title: {
         display: true,
-        text: 'Rental Revenue Performance Difference by Film Category - Store 1 vs. Store 2',
+        text: 'Top 10 Countries with Highest Percent of Rentals in the Shortest Quartile of Movies',
         font: { family: 'DM Sans', size: 13, weight: '600' },
         color: '#1A1A18',
         padding: { bottom: 16 },
       },
       tooltip: {
         callbacks: {
-          label: ctx => {
-            const v = ctx.parsed.y;
-            return (v >= 0 ? 'Store 1 +$' : 'Store 2 +$') + Math.abs(v).toFixed(2);
-          }
+          label: ctx => ctx.parsed.y.toFixed(2) + '%'
         },
         titleFont: { family: 'JetBrains Mono' },
         bodyFont:  { family: 'JetBrains Mono' },
@@ -737,7 +756,7 @@ new Chart(document.getElementById('q1chart'), {
       x: {
         title: {
           display: true,
-          text: 'Film Category',
+          text: 'Country',
           font: { family: 'DM Sans', size: 11 },
           color: '#666',
           padding: { top: 10 },
@@ -750,20 +769,23 @@ new Chart(document.getElementById('q1chart'), {
         },
         grid: { display: false },
         border: { color: '#E0D8CF' },
-        afterFit(scale) { scale.height += 20; },
+        afterFit(scale) { scale.height += 40; },
       },
       y: {
+        min: 0,
+        max: 45,
         title: {
           display: true,
-          text: 'Revenue Difference',
+          text: 'Percent of Rentals in the Shortest Quartile of Movies',
           font: { family: 'DM Sans', size: 11 },
           color: '#666',
           padding: { bottom: 6 },
         },
         ticks: {
+          stepSize: 5,
           font: { family: 'JetBrains Mono', size: 10 },
           color: '#666',
-          callback: v => (v >= 0 ? '+$' : '-$') + Math.abs(v),
+          callback: v => v + '%',
         },
         grid: { color: '#F0EDE9' },
         border: { color: '#E0D8CF' },
