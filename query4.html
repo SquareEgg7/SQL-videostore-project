@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Query 1 — Video Store SQL Analysis</title>
+<title>Query 4 — Video Store SQL Analysis</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -97,6 +97,14 @@
     opacity: 0.85;
   }
   .card p + p { margin-top: 0.75rem; }
+  .card ol {
+    font-size: 0.92rem;
+    line-height: 1.7;
+    color: var(--text-main);
+    opacity: 0.85;
+    margin: 0.75rem 0 0.75rem 1.4rem;
+  }
+  .card ol li + li { margin-top: 0.5rem; }
 
   .business-question {
     font-size: 1.05rem;
@@ -287,18 +295,18 @@
 
 <div class="stepper">
   <a class="stepper-link" href="erd.html">0 &middot; Reading the Schema</a>
-  <span class="current">1 &middot; Query 1</span>
+  <a class="stepper-link" href="query1.html">1 &middot; Query 1</a>
   <a class="stepper-link" href="query2.html">2 &middot; Query 2</a>
   <a class="stepper-link" href="query3.html">3 &middot; Query 3</a>
-  <a class="stepper-link" href="query4.html">4 &middot; Query 4</a>
+  <span class="current">4 &middot; Query 4</span>
 </div>
 
-<h1>Store vs. Store</h1>
-<p class="subtitle">A category-by-category breakdown of rental revenue between the two stores.</p>
+<h1>Preference vs. Spend</h1>
+<p class="subtitle">Whether a customer&rsquo;s inferred taste for female-protagonist films says anything about how much they spend.</p>
 
 <p class="section-label">Business Question</p>
 <div class="card">
-  <p class="business-question">How much more (or less) did Store 1 generate in rental revenue versus Store 2, in each film category?</p>
+  <p class="business-question">Identify customers with a preference for films with a female protagonist (&ldquo;Female Protagonist Positive&rdquo;). Next, divide the customer base (including all customers, not just ones identified as Female Protagonist Positive) into quartiles, based on each customer&rsquo;s total rental payments made (&ldquo;Customer Rental Revenue&rdquo;). Within each quartile, how much total Customer Rental Revenue is represented by customers identified as Female Protagonist Positive versus all other customers (&ldquo;No Preference&rdquo;)?</p>
 </div>
 
 <p class="section-label">Annotated Schema</p>
@@ -316,56 +324,149 @@
 <p class="section-label">Query Output</p>
 <div class="card">
   <div class="chart-container">
-    <canvas id="q1chart"></canvas>
+    <canvas id="q4chart"></canvas>
   </div>
 </div>
 
 <p class="section-label">Key Finding</p>
 <div class="card">
   <div class="key-finding">
-    <p>Across the 16 film categories, Store 1 outperformed Store 2 in 7, ranging from a +$485 lead in Drama down to a +$126 lead in Family. Store 2 outperformed Store 1 in the remaining 9, from a narrow -$60 gap in Games down to a -$398 deficit in Documentary. These category-level revenue gaps could inform resource allocation between the two stores, or help a store-level manager make stocking or promotional decisions specific to that location.</p>
+    <p>Total rental revenue from Female Protagonist Positive customers is nearly identical to No Preference customers in three of the four quartiles. Quartile 3 is the exception: Female Protagonist Positive customers represent under $5,000 in total rental revenue versus over $8,800 for No Preference customers.</p>
   </div>
 </div>
 
 <p class="section-label">Reasoning</p>
 <div class="card">
-  <p>Revenue on its own is simple &mdash; sum every row in <code>payment</code>. The interesting part is how far that number can be broken apart before the schema stops giving you an easy path.</p>
-  <p style="margin-top:0.75rem">Breaking revenue out by store is a short hop: <code>payment</code> &rarr; <code>rental</code> &rarr; <code>inventory</code> gets you to <code>store_id</code>, one additional join beyond the base aggregation. Breaking it out by film category is a longer one &mdash; <code>category</code> isn&rsquo;t adjacent to revenue at all. It lives off <code>film</code>, connected through the <code>film_category</code> junction table, three joins removed from <code>payment</code> in the opposite direction from store.</p>
-  <p style="margin-top:0.75rem">Combining both breakouts in a single result meant joining six tables &mdash; <code>inventory</code>, <code>rental</code>, <code>payment</code>, <code>film</code>, <code>film_category</code>, <code>category</code> &mdash; to synthesize two dimensions that don&rsquo;t live anywhere near each other in the schema, rather than settling for whichever breakout the table structure made convenient.</p>
-  <p style="margin-top:0.75rem">The comparison itself uses a window function rather than a self-join. After grouping by category and store, each category has exactly two rows &mdash; one per store. <code>LEAD()</code>, partitioned by category and ordered by store, pulls Store 2&rsquo;s revenue directly into Store 1&rsquo;s row within that two-row partition, so the difference can be calculated without ever joining the aggregated result back to itself.</p>
+  <p>The first three queries all derive their power from relational reasoning &mdash; the schema already contains the relevant facts (a store&rsquo;s revenue, a customer&rsquo;s country, a film&rsquo;s length), and the work is in joining distant tables to connect those facts to each other. Query 4 is different. There&rsquo;s no column anywhere in this schema that says whether a film has a female protagonist. While that information doesn&rsquo;t exist as structured data, taking a few moments to read the raw data surfaces a pattern &mdash; every <code>description</code> takes the form &ldquo;subject(s)-verb-object(s).&rdquo; By parsing the unstructured text in each film&rsquo;s <code>description</code>, a new fact could be derived that wasn&rsquo;t there to begin with, using the text itself as the only available evidence.</p>
+  <p style="margin-top:0.75rem">Reading alone isn&rsquo;t a fully reliable methodology, since one still cannot read every <code>description</code> in the catalog &mdash; only a plausible sample. However, once the pattern has been recognized, systematic filtration for every <code>description</code> containing &ldquo;woman&rdquo; or &ldquo;girl&rdquo; surfaces edge cases that may have never been read directly.</p>
+  <p style="margin-top:0.75rem">Four edge cases came out of this process:</p>
+  <ol>
+    <li>Some descriptions mention &ldquo;woman&rdquo; or &ldquo;girl&rdquo; only after <code>' who '</code> &mdash; meaning the word isn&rsquo;t the subject in the <code>description</code>: &ldquo;A Epic Tale of a Pioneer And a Hunter who must Escape a Girl in A U-Boat&rdquo; isn&rsquo;t about a girl, it&rsquo;s about a pioneer and a hunter.</li>
+    <li>&ldquo;Womanizer&rdquo; matches &ldquo;woman&rdquo; as a raw substring but isn&rsquo;t necessarily a man or a woman: &ldquo;A Boring Character Study of a Man And a Womanizer who must Succumb a Teacher in An Abandoned Amusement Park&rdquo; &mdash; the word-boundary padding (<code>' Woman '</code> with leading and trailing spaces) exists specifically to exclude cases like this.</li>
+    <li>&ldquo;A Stunning Character Study of a Mad Scientist And a Mad Cow who must Kill a Car in A Monastery&rdquo; &mdash; a scientist isn&rsquo;t necessarily a man or a woman, so &ldquo;scientist&rdquo; was never added as a matching term.</li>
+    <li>&ldquo;A Boring Reflection of a Lumberjack And a Feminist who must Discover a Woman in Nigeria&rdquo; &mdash; a feminist isn&rsquo;t necessarily a man or a woman, so including it would have been an unjustified assumption, not a defensible inference.</li>
+  </ol>
+  <p style="margin-top:0.75rem">With the film-level list of female-protagonist films established, the next step was defining &ldquo;preference&rdquo; at the customer level &mdash; not just &ldquo;has this customer ever rented such a film,&rdquo; but whether they rent them more often than chance alone would predict. That baseline comes from the catalog itself: if some percentage of all films are female-protagonist films, a customer renting from that group at a higher rate than that baseline is renting them more than random selection would produce. Customers whose personal ratio exceeds the catalog-wide ratio are classified &ldquo;Female Protagonist Positive&rdquo;; everyone else falls into &ldquo;No Preference.&rdquo; That turns an otherwise arbitrary judgment call &mdash; how many such rentals count as a real preference? &mdash; into a threshold the data supplies on its own.</p>
+  <p style="margin-top:0.75rem">The second half of the query asks an entirely separate question: does this preference say anything about how much a customer spends? Or, conversely, does the amount of money a customer spends say anything about their preference for films with a female protagonist? Every customer &mdash; not just the Female Protagonist Positive ones &mdash; gets ranked into revenue quartiles based on total rental payments, then each quartile is split by preference classification to compare how much total revenue each group represents within its tier.</p>
 </div>
 
 <details class="sql-details">
-  <summary>Query 1 &mdash; SQL</summary>
+  <summary>Query 4 &mdash; SQL</summary>
   <div class="sql-body">
-<pre>/* table1 creates a table of every combination of film category and store_id.  It then uses an aggregation to create a column of the total rental revenue (sum of payment.amount) for each film category and store_id combination.  It then uses a Window Function to create a column to help compare store1 revenue versus store2 revenue for each film category.  Lastly, it creates a column representing the difference in store1 versus store2 revenue for each film category and store_id combination. */
+<pre>/*
+
+Query 4 - Query used for Slide 4
+
+Question: Identify customers with a preference for films with a female protagonist ("Female Protagonist Positive").  Next, divide the customer base (including all customers, not just ones identified as Female Protagonist Positive) into quartiles, based on each customer's total rental payments made ("Customer Rental Revenue").  Within each quartile, how much total Customer Rental Revenue is represented by customers identified as Female Protagonist Positive versus all other customers?
+
+*/
+
+/* table1 is a list of every film with " Woman " or " Girl " in the film's description, before the word "who".  This means the film has at least one female protagonist.  If the only occurrence of " Woman " or " Girl " in the description is after the word "who", the film has been excluded, since the " Woman " or " Girl " is not the protagonist (e.g. inventory_id 115).  Leading and trailing spaces have been included in " Woman " and " Girl " to exclude any occurrences of those words within other words (e.g. "Womanizer" is the protagonist in inventory_id 260).  Note, while a womanizer could be a woman, we don't know they are female for certain, in the same way that a scientist could be female but we don't know for certain, one way or the other, and will thus not include "scientist" in the list.  Similarly, "Feminist" might not necessarily be a female, so we are not including "Feminist" in the list). */
+
 WITH table1 AS (
-SELECT c.name AS category_name,
-       i.store_id,
-       SUM (p.amount) AS rental_revenue,
-       LEAD (SUM (p.amount)) OVER (PARTITION BY c.name ORDER BY i.store_id) AS next_store_rental_revenue,
-       (SUM (p.amount)) - (LEAD (SUM (p.amount)) OVER (PARTITION BY c.name ORDER BY i.store_id)) AS store_rental_revenue_difference
-  FROM inventory i
-  JOIN rental r
+SELECT f.film_id
+  FROM film f
+ WHERE (
+        STRPOS (f.description, ' Woman ') > 0 AND
+        STRPOS (f.description, ' Woman ') < STRPOS (f.description, ' who ')
+       ) OR
+       (
+        STRPOS (f.description, ' Girl ') > 0 AND
+        STRPOS (f.description, ' Girl ') < STRPOS (f.description, ' who ')
+       )
+),
+
+/* table2 is a list of customer_id's of customers who have rented films with a female protagonist and how many times they have rented such films. */
+
+table2 AS (
+SELECT c.customer_id,
+       COUNT (r.rental_id) AS female_protagonist_rental_count
+  FROM rental r
+  JOIN customer c
+    ON r.customer_id = c.customer_id
+  JOIN inventory i
     ON i.inventory_id = r.inventory_id
-  JOIN payment p
-    ON r.rental_id = p.rental_id
   JOIN film f
     ON f.film_id = i.film_id
-  JOIN film_category fc
-    ON fc.film_id = f.film_id
-  JOIN category c
-    ON fc.category_id = c.category_id
+ WHERE i.film_id IN (
+                          SELECT *
+                            FROM table1
+                         )
+ GROUP BY 1
+ ORDER BY 1, 2
+),
+
+/* table3 is a list of all customer_id's and how many total films each has rented. */
+
+table3 AS (
+SELECT c.customer_id,
+       COUNT (r.rental_id) AS total_rental_count
+  FROM rental r
+  JOIN customer c
+    ON r.customer_id = c.customer_id
+ GROUP BY 1
+ ORDER BY 1, 2
+),
+
+/* table4 joins table2 and table3 to create a list of customer_id's of customers who have rented films with a female protagonist AND whose ratio of how many times they have rented such films to how many total films they have rented is greater than the ratio of films with a female protagonist to all films in the database.  This is a list of customers with a preference for films with a female protagonist since they have rented films with a female protagonist at a higher rate than would result from a random renting of films.  Note, I have deliberately chosen to use the ratio of film_id's rather than ratio of inventory_id's as a comparison to each customer's rental history, under the assumption that in general, having a greater number of copies of a certain film will not make it more likely to be rented. */
+
+table4 AS (
+SELECT t2.customer_id
+  FROM table2 t2
+  JOIN table3 t3
+    ON t2.customer_id = t3.customer_id
+ WHERE (CAST (t2.female_protagonist_rental_count AS FLOAT) / t3.total_rental_count) >
+       (CAST (
+             (
+              SELECT COUNT (*)
+                FROM table1
+             ) AS FLOAT) /
+             (
+              SELECT COUNT (f.film_id)
+                FROM film f
+             )
+        )
+),
+
+/* table5 creates a table of every customer's customer_id, total amount of revenue they have generated through rental payments ("Customer Total Rental Revenue"), uses a Window Function to determine what Customer Total Rental Revenue quartile they are in, and whether they have rented films with a female protagonist at a higher rate than would result from a random renting of films ("Female Protagonist Positive") or not ("No Preference"). */
+
+
+table5 AS (
+SELECT c.customer_id,
+       SUM (p.amount) AS customer_total_rental_revenue,
+       NTILE (4) OVER (ORDER BY SUM (p.amount) DESC) AS customer_total_rental_revenue_quartile,
+       CASE WHEN c.customer_id IN (
+                                   SELECT *
+                                    FROM table4
+                                   ) THEN 'female protagonist positive'
+            ELSE 'no preference' END AS female_protagonist_renter_profile
+  FROM customer c
+  JOIN payment p
+    ON c.customer_id = p.customer_id
+ GROUP BY 1
+),
+
+/* table6 shows the quartiles of customers based on Customer Total Rental Revenue.  Within each quartile, Customer Total Rental Revenue is summed for each of two categories of customers: (1) Female Protagonist Positive and (2) No Preference.  Two additional columns are created to help format the final exported table for Excel */
+
+table6 AS (
+SELECT customer_total_rental_revenue_quartile,
+       female_protagonist_renter_profile,
+       SUM (customer_total_rental_revenue) AS customer_total_rental_revenue,
+       CONCAT ('$', LAG (SUM (customer_total_rental_revenue)) OVER (PARTITION BY customer_total_rental_revenue_quartile ORDER BY female_protagonist_renter_profile)) AS female_protagonist_positive,
+       CASE WHEN female_protagonist_renter_profile  = 'no preference' THEN CONCAT ('$', SUM (customer_total_rental_revenue))
+            ELSE NULL END AS no_preference
+  FROM table5
  GROUP BY 1, 2
  ORDER BY 1, 2
 )
 
-/* the output table cleans up table1 so that you are left with a column of category names and a second column representing the difference in rental revenue between store1 and store2 for each category.  A positive difference in rental revenue represents a category where store1 outperformed store2.  A negative difference in rental revenue represents a category where store1 underperformed store2. */
-SELECT category_name,
-       store_rental_revenue_difference
-  FROM table1
- WHERE store_rental_revenue_difference IS NOT NULL
- ORDER BY 2 DESC;</pre>
+/* the final output reformats table6 for Excel */
+
+SELECT customer_total_rental_revenue_quartile,
+       female_protagonist_positive,
+       no_preference
+  FROM table6
+ WHERE no_preference IS NOT NULL;</pre>
   </div>
 </details>
 
@@ -383,7 +484,7 @@ SELECT category_name,
 </div>
 
 <script>
-// ── ERD drawing engine (shared with erd.html) ──────────────────────────────
+// ── ERD drawing engine (shared with erd.html / query1.html / query2.html / query3.html) ──
 const TW = 126;
 const SYM_D2 = 16;
 function symOuter(code) { return code === '1' ? 24 : SYM_D2; }
@@ -595,7 +696,7 @@ function draw(pos, opts, targetEl) {
 }
 
 // ── Annotated schema (name-only boxes, compressed layout) ──────────────────
-const QUERY1_TABLES = new Set(['category','film_category','film','inventory','rental','payment']);
+const QUERY4_TABLES = new Set(['film','rental','customer','inventory','payment']);
 
 const annotatedPos = {
   rental:        { x: 537, y: 20  },
@@ -635,7 +736,7 @@ function drawAnnotated() {
   // Connectors first
   conns.forEach(([from, to, , , , route]) => {
     if (!annotatedPos[from] || !annotatedPos[to]) return;
-    const isHL = QUERY1_TABLES.has(from) && QUERY1_TABLES.has(to);
+    const isHL = QUERY4_TABLES.has(from) && QUERY4_TABLES.has(to);
 
     let fixedY = undefined;
     if (route && route.yRef) {
@@ -656,7 +757,7 @@ function drawAnnotated() {
   // Table boxes on top
   Object.keys(tables).filter(id => annotatedPos[id]).forEach(id => {
     const p = annotatedPos[id];
-    const isHL = QUERY1_TABLES.has(id);
+    const isHL = QUERY4_TABLES.has(id);
     if (isHL) {
       html += `<rect x="${p.x}" y="${p.y}" width="${TW}" height="${ANNOT_H}" rx="5" fill="#2D7D7B" stroke="#2D7D7B" stroke-width="1.5"/>
         <text font-family="JetBrains Mono, monospace" font-size="11" font-weight="600" fill="white" x="${p.x + TW/2}" y="${p.y + ANNOT_H/2 + 4}" text-anchor="middle">${tables[id].label}</text>`;
@@ -694,40 +795,58 @@ document.getElementById('modalOverlay').addEventListener('click', function(e) {
 });
 
 // ── Chart ──────────────────────────────────────────────────────────────────
-const chartLabels = ['Drama','New','Comedy','Foreign','Action','Music','Family','Games','Animation','Children','Travel','Classics','Sports','Sci-Fi','Horror','Documentary'];
-const chartData   = [485.24, 466.30, 336.44, 259.89, 227.30, 162.58, 125.75, -60.44, -107.67, -159.59, -182.64, -207.56, -316.33, -325.45, -360.33, -397.71];
+const chartLabels = ['1', '2', '3', '4'];
+const fppData          = [10004.85, 8142.47, 4987.72, 5444.95];
+const noPreferenceData  = [10324.04, 8120.82, 8876.33, 5410.86];
 
-new Chart(document.getElementById('q1chart'), {
+new Chart(document.getElementById('q4chart'), {
   type: 'bar',
   data: {
     labels: chartLabels,
-    datasets: [{
-      data: chartData,
-      backgroundColor: '#8FBFBD',
-      borderColor:     '#6AADAB',
-      borderWidth: 1,
-      borderRadius: 4,
-    }]
+    datasets: [
+      {
+        label: 'Female Protagonist Positive',
+        data: fppData,
+        backgroundColor: '#2D7D7B',
+        borderColor:     '#1F5A58',
+        borderWidth: 1,
+        borderRadius: 4,
+      },
+      {
+        label: 'No Preference',
+        data: noPreferenceData,
+        backgroundColor: '#8FBFBD',
+        borderColor:     '#6AADAB',
+        borderWidth: 1,
+        borderRadius: 4,
+      }
+    ]
   },
   options: {
     responsive: true,
     maintainAspectRatio: false,
     layout: { padding: { right: 24 } },
     plugins: {
-      legend: { display: false },
+      legend: {
+        display: true,
+        position: 'top',
+        labels: {
+          font: { family: 'DM Sans', size: 11 },
+          color: '#666',
+          boxWidth: 12,
+          boxHeight: 12,
+        }
+      },
       title: {
         display: true,
-        text: 'Rental Revenue Performance Difference by Film Category - Store 1 vs. Store 2',
+        text: 'Total Customer Rental Revenue: Female Protagonist Positive vs. No Preference',
         font: { family: 'DM Sans', size: 13, weight: '600' },
         color: '#1A1A18',
         padding: { bottom: 16 },
       },
       tooltip: {
         callbacks: {
-          label: ctx => {
-            const v = ctx.parsed.y;
-            return (v >= 0 ? 'Store 1 +$' : 'Store 2 +$') + Math.abs(v).toFixed(2);
-          }
+          label: ctx => `${ctx.dataset.label}: $${ctx.parsed.y.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
         },
         titleFont: { family: 'JetBrains Mono' },
         bodyFont:  { family: 'JetBrains Mono' },
@@ -737,33 +856,33 @@ new Chart(document.getElementById('q1chart'), {
       x: {
         title: {
           display: true,
-          text: 'Film Category',
+          text: 'Customer Rental Revenue Quartile',
           font: { family: 'DM Sans', size: 11 },
           color: '#666',
           padding: { top: 10 },
         },
         ticks: {
           font: { family: 'JetBrains Mono', size: 10 },
-          maxRotation: 45,
-          minRotation: 45,
           color: '#666',
         },
         grid: { display: false },
         border: { color: '#E0D8CF' },
-        afterFit(scale) { scale.height += 20; },
       },
       y: {
+        min: 0,
+        max: 12000,
         title: {
           display: true,
-          text: 'Revenue Difference',
+          text: 'Total Customer Rental Revenue',
           font: { family: 'DM Sans', size: 11 },
           color: '#666',
           padding: { bottom: 6 },
         },
         ticks: {
+          stepSize: 2000,
           font: { family: 'JetBrains Mono', size: 10 },
           color: '#666',
-          callback: v => (v >= 0 ? '+$' : '-$') + Math.abs(v),
+          callback: v => '$' + v.toLocaleString(),
         },
         grid: { color: '#F0EDE9' },
         border: { color: '#E0D8CF' },
