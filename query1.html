@@ -135,6 +135,29 @@
 
   svg { width: 100%; height: auto; display: block; }
 
+  /* Color key (annotated schema) */
+  .color-key {
+    display: flex;
+    gap: 1.75rem;
+    flex-wrap: wrap;
+    margin-top: 1rem;
+  }
+  .color-key-item {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+  }
+  .color-key-item .swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: inline-block;
+  }
+
   /* Chart */
   .chart-container {
     position: relative;
@@ -285,6 +308,9 @@
     <button class="schema-btn" onclick="openModal()">View full schema &rarr;</button>
   </div>
   <svg id="annotated-svg" viewBox="0 0 1200 370" xmlns="http://www.w3.org/2000/svg"></svg>
+  <div class="color-key">
+    <span class="color-key-item"><span class="swatch" style="background:#2D7D7B"></span>Query tables</span>
+  </div>
 </div>
 
 <p class="section-label">Query Output</p>
@@ -709,6 +735,13 @@ new Chart(document.getElementById('q1chart'), {
     },
     scales: {
       x: {
+        title: {
+          display: true,
+          text: 'Film Category',
+          font: { family: 'DM Sans', size: 11 },
+          color: '#666',
+          padding: { top: 10 },
+        },
         ticks: {
           font: { family: 'JetBrains Mono', size: 10 },
           maxRotation: 45,
