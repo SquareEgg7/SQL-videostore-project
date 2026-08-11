@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Query 1 — Video Store SQL Analysis</title>
+<title>Query 2 — Video Store SQL Analysis</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -18,6 +18,7 @@
     --teal-soft: #DCEBEA;
     --amber: #B8860B;
     --amber-soft: #F5E9CE;
+    --plum: #6E3E54;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -135,10 +136,39 @@
 
   svg { width: 100%; height: auto; display: block; }
 
+  /* Color key (annotated schema) */
+  .color-key {
+    display: flex;
+    gap: 1.75rem;
+    flex-wrap: wrap;
+    margin-top: 1rem;
+  }
+  .color-key-item {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+  }
+  .color-key-item .swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: inline-block;
+  }
+
   /* Chart */
   .chart-container {
     position: relative;
     height: 380px;
+  }
+  .chart-footnote {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    opacity: 1;
+    margin-top: 0.9rem;
   }
 
   /* Key finding */
@@ -264,18 +294,18 @@
 
 <div class="stepper">
   <a class="stepper-link" href="erd.html">0 &middot; Reading the Schema</a>
-  <span class="current">1 &middot; Query 1</span>
-  <a class="stepper-link" href="query2.html">2 &middot; Query 2</a>
+  <a class="stepper-link" href="query1.html">1 &middot; Query 1</a>
+  <span class="current">2 &middot; Query 2</span>
   <span>3 &middot; Query 3</span>
   <span>4 &middot; Query 4</span>
 </div>
 
-<h1>Store vs. Store</h1>
-<p class="subtitle">A category-by-category breakdown of rental revenue between the two stores.</p>
+<h1>Who Overpays the Most?</h1>
+<p class="subtitle">A country-by-country look at how far actual rental payments diverge from what customers technically owed.</p>
 
 <p class="section-label">Business Question</p>
 <div class="card">
-  <p class="business-question">How much more (or less) did Store 1 generate in rental revenue versus Store 2, in each film category?</p>
+  <p class="business-question">For each country where customers live, aggregate total rental payments received and divide by total rental payments owed to determine the &ldquo;National Average Overpayment Rate.&rdquo; Which countries are in the top 10% of countries by National Average Overpayment Rate, and what is their rate of overpayment?</p>
 </div>
 
 <p class="section-label">Annotated Schema</p>
@@ -285,61 +315,89 @@
     <button class="schema-btn" onclick="openModal()">View full schema &rarr;</button>
   </div>
   <svg id="annotated-svg" viewBox="0 0 1200 370" xmlns="http://www.w3.org/2000/svg"></svg>
+  <div class="color-key">
+    <span class="color-key-item"><span class="swatch" style="background:#2D7D7B"></span>Query tables</span>
+    <span class="color-key-item"><span class="swatch" style="background:#6E3E54"></span>LEFT JOIN &mdash; see reasoning below for why this matters</span>
+  </div>
 </div>
 
 <p class="section-label">Query Output</p>
 <div class="card">
   <div class="chart-container">
-    <canvas id="q1chart"></canvas>
+    <canvas id="q2chart"></canvas>
   </div>
+  <p class="chart-footnote">*Displayed as &lsquo;Runion&rsquo; to match the database&rsquo;s stored value (missing its accent); the actual country is R&eacute;union.</p>
 </div>
 
 <p class="section-label">Key Finding</p>
 <div class="card">
   <div class="key-finding">
-    <p>Across the 16 film categories, Store 1 outperformed Store 2 in 7, ranging from a +$485 lead in Drama down to a +$126 lead in Family. Store 2 outperformed Store 1 in the remaining 9, from a narrow -$60 gap in Games down to a -$398 deficit in Documentary. These category-level revenue gaps could inform resource allocation between the two stores, or help a store-level manager make stocking or promotional decisions specific to that location.</p>
+    <p>Among countries with a positive National Average Overpayment Rate, 11 fall in the top 10%. Iraq leads at 62.56%, followed closely by French Guiana (58.30%) and Greenland (58.23%). The remaining eight range from Afghanistan (54.77%) down to R&eacute;union (43.38%).</p>
   </div>
 </div>
 
 <p class="section-label">Reasoning</p>
 <div class="card">
-  <p>Revenue on its own is simple &mdash; sum every row in <code>payment</code>. The interesting part is how far that number can be broken apart before the schema stops giving you an easy path.</p>
-  <p style="margin-top:0.75rem">Breaking revenue out by store is a short hop: <code>payment</code> &rarr; <code>rental</code> &rarr; <code>inventory</code> gets you to <code>store_id</code>, one additional join beyond the base aggregation. Breaking it out by film category is a longer one &mdash; <code>category</code> isn&rsquo;t adjacent to revenue at all. It lives off <code>film</code>, connected through the <code>film_category</code> junction table, three joins removed from <code>payment</code> in the opposite direction from store.</p>
-  <p style="margin-top:0.75rem">Combining both breakouts in a single result meant joining six tables &mdash; <code>inventory</code>, <code>rental</code>, <code>payment</code>, <code>film</code>, <code>film_category</code>, <code>category</code> &mdash; to synthesize two dimensions that don&rsquo;t live anywhere near each other in the schema, rather than settling for whichever breakout the table structure made convenient.</p>
-  <p style="margin-top:0.75rem">The comparison itself uses a window function rather than a self-join. After grouping by category and store, each category has exactly two rows &mdash; one per store. <code>LEAD()</code>, partitioned by category and ordered by store, pulls Store 2&rsquo;s revenue directly into Store 1&rsquo;s row within that two-row partition, so the difference can be calculated without ever joining the aggregated result back to itself.</p>
+  <p>The original plan was to find individual customers who had underpaid &mdash; a straightforward search for payment shortfalls. I could then list them (if the list was short) or run further analyses on their location, rental habits, or other sub-metrics. Early exploratory queries turned that plan on its head: payment amounts barely tracked each film&rsquo;s <code>rental_rate</code> at all. In fact, no customer had paid exactly what they owed, 4% of customers had underpaid, and a whopping 96% of customers had overpaid.</p>
+  <p style="margin-top:0.75rem">Given that 96% of customers in the database had overpaid, this metric seemed worth digging into. Further queries showed that overpayment was so widespread that it wasn&rsquo;t just individuals who had overpaid. On average, the entire customer base of entire countries had overpaid. To be exact, out of 108 countries, only 3 had underpaid in aggregate. The other 105 had all overpaid in aggregate. That reframed the question entirely. Rather than hunting for underpayers, the analysis shifted to quantifying just how widespread this overpayment pattern actually was, country by country.</p>
+  <p style="margin-top:0.75rem">Quantifying it needed its own metric, since raw dollar totals aren&rsquo;t comparable across countries with very different rental volumes. Dividing total paid by total owed, then subtracting 1, produces a rate &mdash; the &ldquo;National Average Overpayment Rate&rdquo; &mdash; that puts every country on the same scale regardless of size. <code>NTILE(10)</code>, applied only to the countries with a positive rate, then isolates the top decile of overpayers specifically.</p>
+  <p style="margin-top:0.75rem">The <code>LEFT JOIN</code> in the first CTE exists because of a specific discovery in those exploratory queries: some rentals had no payment row at all. An inner join would have silently dropped those unpaid rentals from the analysis entirely, understating how much was actually owed. The <code>CASE WHEN</code> alongside it converts those missing payments to $0.00, so they still count toward the total owed even though nothing was collected.</p>
 </div>
 
 <details class="sql-details">
-  <summary>Query 1 &mdash; SQL</summary>
+  <summary>Query 2 &mdash; SQL</summary>
   <div class="sql-body">
-<pre>/* table1 creates a table of every combination of film category and store_id.  It then uses an aggregation to create a column of the total rental revenue (sum of payment.amount) for each film category and store_id combination.  It then uses a Window Function to create a column to help compare store1 revenue versus store2 revenue for each film category.  Lastly, it creates a column representing the difference in store1 versus store2 revenue for each film category and store_id combination. */
+<pre>/* table1 creates a table of every rental_id, the country where the customer lives, the amount due, and the amount paid for the rental.  Running a couple initial queries determines that payment amounts do not necessarily correlate with the rental_rate for a given film.  In some cases, payment was made but it was more or less than the rental_rate.  In some cases, a payment was made but it was $0.00.  In one case, multiple payments were made for a single rental (rental_id 4591 appears in 5 different records with unique payments_id's).  Since there are some cases where no payment was made (a rental_id does not appear in any record in the payment database), the payment database needs to be LEFT JOINed to capture those records from the rental database that do not have a rental_id in the payment database.  The CASE WHEN statement is used to give the resulting records with a NULL value for p.amount a value so that they can be used to calculate balances in table2 */
+
 WITH table1 AS (
-SELECT c.name AS category_name,
-       i.store_id,
-       SUM (p.amount) AS rental_revenue,
-       LEAD (SUM (p.amount)) OVER (PARTITION BY c.name ORDER BY i.store_id) AS next_store_rental_revenue,
-       (SUM (p.amount)) - (LEAD (SUM (p.amount)) OVER (PARTITION BY c.name ORDER BY i.store_id)) AS store_rental_revenue_difference
-  FROM inventory i
+SELECT r.rental_id,
+       c3.country,
+       f.rental_rate AS amount_due,
+       CASE WHEN p.amount IS NULL THEN '0.00'
+            ELSE p.amount END AS amount_paid
+  FROM customer c
   JOIN rental r
+    ON c.customer_id = r.customer_id
+  LEFT JOIN payment p
+    ON p.rental_id = r.rental_id
+  JOIN inventory i
     ON i.inventory_id = r.inventory_id
-  JOIN payment p
-    ON r.rental_id = p.rental_id
   JOIN film f
     ON f.film_id = i.film_id
-  JOIN film_category fc
-    ON fc.film_id = f.film_id
-  JOIN category c
-    ON fc.category_id = c.category_id
- GROUP BY 1, 2
- ORDER BY 1, 2
+  JOIN address a
+    ON c.address_id = a.address_id
+  JOIN city c2
+    ON a.city_id = c2.city_id
+  JOIN country c3
+    ON c2.country_id = c3.country_id
+ ORDER BY 2
+),
+
+/* table2 sums the amount paid, amount due, and divides the two to determine the National Average Overpayment Rate, grouping by country, ordering from highest to lowest by National Average Overpayment Rate. */
+table2 AS (
+SELECT country,
+       SUM (amount_paid) AS total_amount_paid,
+       SUM (amount_due) AS total_amount_due,
+       (SUM (amount_paid) / SUM (amount_due)) - 1 AS national_average_overpayment_rate
+  FROM table1
+ GROUP BY 1
+ ORDER BY 4 DESC
+),
+
+/* table3 uses a Window Function to determine the top 10% of countries by Country-Wide Overpayment Rate, including only countries that have overpaid (some countries have underpaid). */
+table3 AS (
+SELECT country,
+       national_average_overpayment_rate,
+       NTILE (10) OVER (ORDER BY national_average_overpayment_rate DESC) AS national_average_overpayment_rate_decile
+  FROM table2
+ WHERE national_average_overpayment_rate > 0
 )
 
-/* the output table cleans up table1 so that you are left with a column of category names and a second column representing the difference in rental revenue between store1 and store2 for each category.  A positive difference in rental revenue represents a category where store1 outperformed store2.  A negative difference in rental revenue represents a category where store1 underperformed store2. */
-SELECT category_name,
-       store_rental_revenue_difference
-  FROM table1
- WHERE store_rental_revenue_difference IS NOT NULL
- ORDER BY 2 DESC;</pre>
+/* The final output shows the country and overpayment rate of only countries in the top 10%. */
+SELECT country,
+       national_average_overpayment_rate
+  FROM table3
+ WHERE national_average_overpayment_rate_decile = 1;</pre>
   </div>
 </details>
 
@@ -357,7 +415,7 @@ SELECT category_name,
 </div>
 
 <script>
-// ── ERD drawing engine (shared with erd.html) ──────────────────────────────
+// ── ERD drawing engine (shared with erd.html / query1.html) ────────────────
 const TW = 126;
 const SYM_D2 = 16;
 function symOuter(code) { return code === '1' ? 24 : SYM_D2; }
@@ -569,7 +627,9 @@ function draw(pos, opts, targetEl) {
 }
 
 // ── Annotated schema (name-only boxes, compressed layout) ──────────────────
-const QUERY1_TABLES = new Set(['category','film_category','film','inventory','rental','payment']);
+const QUERY2_TABLES = new Set(['customer','rental','inventory','film','address','city','country']);
+const QUERY2_PLUM_TABLE = 'payment';
+const QUERY2_PLUM_CONN = ['payment','rental'];
 
 const annotatedPos = {
   rental:        { x: 537, y: 20  },
@@ -602,6 +662,11 @@ function annotEdgePt(id, side, fixedY) {
   return { x: p.x + TW/2, y: p.y + ANNOT_H/2 };
 }
 
+function isPlumConn(from, to) {
+  return (from === QUERY2_PLUM_CONN[0] && to === QUERY2_PLUM_CONN[1]) ||
+         (from === QUERY2_PLUM_CONN[1] && to === QUERY2_PLUM_CONN[0]);
+}
+
 function drawAnnotated() {
   const svgEl = document.getElementById('annotated-svg');
   let html = '';
@@ -609,7 +674,8 @@ function drawAnnotated() {
   // Connectors first
   conns.forEach(([from, to, , , , route]) => {
     if (!annotatedPos[from] || !annotatedPos[to]) return;
-    const isHL = QUERY1_TABLES.has(from) && QUERY1_TABLES.has(to);
+    const plum = isPlumConn(from, to);
+    const isHL = QUERY2_TABLES.has(from) && QUERY2_TABLES.has(to);
 
     let fixedY = undefined;
     if (route && route.yRef) {
@@ -621,17 +687,23 @@ function drawAnnotated() {
     const b = route ? annotEdgePt(to,   route.to,   fixedY) : { x: annotatedPos[to].x   + TW/2, y: annotatedPos[to].y   + ANNOT_H/2 };
     if (!a || !b) return;
 
-    const stroke = isHL ? '#2D7D7B' : '#D8D0C8';
-    const sw     = isHL ? 2 : 1;
-    const opacity = isHL ? 1 : 0.6;
+    let stroke, sw, opacity;
+    if (plum) { stroke = '#6E3E54'; sw = 2; opacity = 1; }
+    else if (isHL) { stroke = '#2D7D7B'; sw = 2; opacity = 1; }
+    else { stroke = '#D8D0C8'; sw = 1; opacity = 0.6; }
+
     html += `<line stroke="${stroke}" stroke-width="${sw}" opacity="${opacity}" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"/>`;
   });
 
   // Table boxes on top
   Object.keys(tables).filter(id => annotatedPos[id]).forEach(id => {
     const p = annotatedPos[id];
-    const isHL = QUERY1_TABLES.has(id);
-    if (isHL) {
+    const isPlum = id === QUERY2_PLUM_TABLE;
+    const isHL = QUERY2_TABLES.has(id);
+    if (isPlum) {
+      html += `<rect x="${p.x}" y="${p.y}" width="${TW}" height="${ANNOT_H}" rx="5" fill="#6E3E54" stroke="#6E3E54" stroke-width="1.5"/>
+        <text font-family="JetBrains Mono, monospace" font-size="11" font-weight="600" fill="white" x="${p.x + TW/2}" y="${p.y + ANNOT_H/2 + 4}" text-anchor="middle">${tables[id].label}</text>`;
+    } else if (isHL) {
       html += `<rect x="${p.x}" y="${p.y}" width="${TW}" height="${ANNOT_H}" rx="5" fill="#2D7D7B" stroke="#2D7D7B" stroke-width="1.5"/>
         <text font-family="JetBrains Mono, monospace" font-size="11" font-weight="600" fill="white" x="${p.x + TW/2}" y="${p.y + ANNOT_H/2 + 4}" text-anchor="middle">${tables[id].label}</text>`;
     } else {
@@ -668,10 +740,10 @@ document.getElementById('modalOverlay').addEventListener('click', function(e) {
 });
 
 // ── Chart ──────────────────────────────────────────────────────────────────
-const chartLabels = ['Drama','New','Comedy','Foreign','Action','Music','Family','Games','Animation','Children','Travel','Classics','Sports','Sci-Fi','Horror','Documentary'];
-const chartData   = [485.24, 466.30, 336.44, 259.89, 227.30, 162.58, 125.75, -60.44, -107.67, -159.59, -182.64, -207.56, -316.33, -325.45, -360.33, -397.71];
+const chartLabels = ['Iraq','French Guiana','Greenland','Afghanistan','Ethiopia','Kazakstan','Hungary','Holy See (Vatican City State)','Moldova','Belarus','Runion*'];
+const chartData   = [62.56, 58.30, 58.23, 54.77, 51.01, 51.01, 49.52, 47.18, 45.63, 44.85, 43.38];
 
-new Chart(document.getElementById('q1chart'), {
+new Chart(document.getElementById('q2chart'), {
   type: 'bar',
   data: {
     labels: chartLabels,
@@ -691,17 +763,14 @@ new Chart(document.getElementById('q1chart'), {
       legend: { display: false },
       title: {
         display: true,
-        text: 'Rental Revenue Performance Difference by Film Category - Store 1 vs. Store 2',
+        text: 'National Average Overpayment Rate - Top 10%',
         font: { family: 'DM Sans', size: 13, weight: '600' },
         color: '#1A1A18',
         padding: { bottom: 16 },
       },
       tooltip: {
         callbacks: {
-          label: ctx => {
-            const v = ctx.parsed.y;
-            return (v >= 0 ? 'Store 1 +$' : 'Store 2 +$') + Math.abs(v).toFixed(2);
-          }
+          label: ctx => ctx.parsed.y.toFixed(2) + '%'
         },
         titleFont: { family: 'JetBrains Mono' },
         bodyFont:  { family: 'JetBrains Mono' },
@@ -709,6 +778,13 @@ new Chart(document.getElementById('q1chart'), {
     },
     scales: {
       x: {
+        title: {
+          display: true,
+          text: 'Country',
+          font: { family: 'DM Sans', size: 11 },
+          color: '#666',
+          padding: { top: 10 },
+        },
         ticks: {
           font: { family: 'JetBrains Mono', size: 10 },
           maxRotation: 45,
@@ -717,20 +793,23 @@ new Chart(document.getElementById('q1chart'), {
         },
         grid: { display: false },
         border: { color: '#E0D8CF' },
-        afterFit(scale) { scale.height += 20; },
+        afterFit(scale) { scale.height += 40; },
       },
       y: {
+        min: 0,
+        max: 70,
         title: {
           display: true,
-          text: 'Revenue Difference',
+          text: 'National Average Overpayment Rate',
           font: { family: 'DM Sans', size: 11 },
           color: '#666',
           padding: { bottom: 6 },
         },
         ticks: {
+          stepSize: 10,
           font: { family: 'JetBrains Mono', size: 10 },
           color: '#666',
-          callback: v => (v >= 0 ? '+$' : '-$') + Math.abs(v),
+          callback: v => v + '%',
         },
         grid: { color: '#F0EDE9' },
         border: { color: '#E0D8CF' },
