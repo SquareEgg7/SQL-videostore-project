@@ -16,8 +16,6 @@
     --border-faint: #E0D8CF;
     --teal: #2D7D7B;
     --teal-soft: #DCEBEA;
-    --amber: #B8860B;
-    --amber-soft: #F5E9CE;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -293,12 +291,10 @@
   <a class="stepper-link" href="query4.html">4 &middot; Query 4</a>
 </div>
 
-<h1>Short Films by Country</h1>
-<p class="subtitle">Which countries&rsquo; customers lean most heavily toward the shortest quartile of films, and by how much.</p>
-
-<p class="section-label">Business Question</p>
-<div class="card">
-  <p class="business-question">What percent of each country&rsquo;s total rentals are represented by films in the shortest quartile (by length)? Show only the top 10 countries.</p>
+<h1>Inferring Customer Preference From Product Attributes, Not Customer Data</h1>
+<div class="card" style="margin:1.5rem 0 2.5rem">
+  <p>Query 3 infers customer preference from product attributes, not customer data &mdash; this database has no field describing what any customer actually likes, only a detailed description of what they rented, including each film&rsquo;s length.  By categorizing every rental according to a characteristic of the film itself &mdash; here, whether it falls in the shortest quartile by length &mdash; then aggregating that categorization by whatever customer segment is available (here, country), a preference emerges that was never recorded directly anywhere.</p>
+  <p style="margin-top:0.75rem">The same idea works in any database that logs interactions between customers and products with describable attributes: a streaming platform has no field for &ldquo;prefers short-form content,&rdquo; but average watch time, categorized by content runtime and aggregated by subscriber region, reveals the same pattern.  You&rsquo;re not asking customers what they like &mdash; you&rsquo;re inferring it from the measurable characteristics of what they actually chose.</p>
 </div>
 
 <p class="section-label">Annotated Schema</p>
@@ -313,25 +309,11 @@
   </div>
 </div>
 
-<p class="section-label">Query Output</p>
-<div class="card">
-  <div class="chart-container">
-    <canvas id="q3chart"></canvas>
-  </div>
-</div>
-
-<p class="section-label">Key Finding</p>
-<div class="card">
-  <div class="key-finding">
-    <p>Among the ten countries with the highest share of short-film rentals, French Guiana leads &mdash; over 40% of the movies its customers rented fall in the shortest quartile by length, the only country above 40%. Malawi (39.3%) and Ethiopia (39.1%) follow closely, with the remaining seven ranging down to Liechtenstein at 32.1%.</p>
-  </div>
-</div>
-
 <p class="section-label">Reasoning</p>
 <div class="card">
-  <p>Geography is really the only rich way to segment customers this database supports directly &mdash; there&rsquo;s no age, income, or account-tenure data to profile individuals against. So the question became: given geography as the available lens, what&rsquo;s a behavioral signal worth measuring across it? Film <code>length</code> seemed like a reasonable proxy for viewing preference &mdash; do customers in some countries lean toward shorter films than others?</p>
-  <p style="margin-top:0.75rem">Defining &ldquo;short&rdquo; needed an objective cutoff rather than an arbitrary one (e.g., &ldquo;under 60 minutes&rdquo;), so <code>NTILE(4)</code>, applied to every film ordered by <code>length</code>, splits the catalog into even quartiles &mdash; the shortest 25% of films by count become quartile 1. Worth noting: film <code>length</code> in this dataset turns out to be close to evenly distributed from 46 to 185 minutes, with no natural clustering around any particular runtime &mdash; so the quartile cutoff (80 minutes) isn&rsquo;t marking a distinct &ldquo;short film&rdquo; category so much as a clean, rank-based 25% line through an otherwise smooth spread.</p>
-  <p style="margin-top:0.75rem">That film-level quartile gets tied to individual rentals through a <code>CASE WHEN ... IN (...)</code> subquery: for each rental, check whether its film&rsquo;s ID appears in the pre-computed list of quartile-1 film IDs, and flag it with a 1 if so. From there, it&rsquo;s a straightforward ratio per country &mdash; count of short-film rentals divided by total rentals, as a percentage &mdash; sorted to surface the top 10.</p>
+  <p><code>NTILE(4)</code>, applied to every film ordered by length, splits the catalog into even quartiles &mdash; the shortest 25% of films by count become quartile 1.  Worth noting: film length in this dataset turns out to be close to evenly distributed from 46 to 185 minutes, with no natural clustering around any particular runtime &mdash; so the quartile cutoff (80 minutes) isn&rsquo;t marking a distinct &ldquo;short film&rdquo; category so much as a clean, rank-based 25% line through an otherwise smooth spread.  Determining which quartile a film falls into needs only <code>film.length</code> and <code>NTILE(4)</code>, ordered by length across every row in <code>film</code> &mdash; a single-table calculation with no join required.</p>
+  <p style="margin-top:0.75rem">Tying that per-film quartile to a specific country, however, requires the same kind of long join chain as Query 2 &mdash; six joins in total to attach a country to a specific film.</p>
+  <p style="margin-top:0.75rem">That film-level quartile gets tied to individual rentals through a <code>CASE WHEN ... IN (...)</code> subquery: for each rental, check whether its <code>film.film_id</code> appears in the pre-computed list of quartile-1 film IDs, and flag it with a 1 if so.  From there, it&rsquo;s a straightforward ratio per country &mdash; count of short-film rentals divided by total rentals, as a percentage &mdash; sorted to surface the top 10.</p>
 </div>
 
 <details class="sql-details">
@@ -390,6 +372,20 @@ SELECT country,
  LIMIT 10;</pre>
   </div>
 </details>
+
+<p class="section-label" style="margin-top:3rem">Appendix</p>
+<div class="card">
+  <div class="chart-container">
+    <canvas id="q3chart"></canvas>
+  </div>
+</div>
+
+<p class="section-label">Key Finding</p>
+<div class="card">
+  <div class="key-finding">
+    <p>Among the ten countries with the highest share of short-film rentals, French Guiana leads &mdash; over 40% of the movies its customers rented fall in the shortest quartile by length, the only country above 40%. Malawi (39.3%) and Ethiopia (39.1%) follow closely, with the remaining seven ranging down to Liechtenstein at 32.1%.</p>
+  </div>
+</div>
 
 <!-- Modal for full corrected schema -->
 <div class="modal-overlay" id="modalOverlay">

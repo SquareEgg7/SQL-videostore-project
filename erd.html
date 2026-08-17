@@ -15,8 +15,8 @@
     --border-faint: #E0D8CF;
     --teal: #2D7D7B;
     --teal-soft: #DCEBEA;
-    --amber: #B8860B;
-    --amber-soft: #F5E9CE;
+    --wrong: #A8433D;
+    --wrong-soft: #F3E1DF;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -108,7 +108,7 @@
     fill: none;
     transition: stroke 0.4s ease;
   }
-  .conn.wrong { stroke: var(--amber); stroke-width: 2; }
+  .conn.wrong { stroke: var(--wrong); stroke-width: 2; }
   .conn.correct { stroke: var(--teal); }
 
   .sym {
@@ -117,7 +117,7 @@
     fill: var(--text-muted);
     transition: fill 0.4s ease;
   }
-  .sym.wrong { fill: var(--amber); font-weight: 700; }
+  .sym.wrong { fill: var(--wrong); font-weight: 700; }
   .sym.correct { fill: var(--teal); font-weight: 700; }
 
   .controls {
@@ -264,6 +264,9 @@
 
       <h3>Three columns look like foreign keys but aren't enforced</h3>
       <p><code>staff.store_id</code>, <code>inventory.store_id</code>, and <code>customer.store_id</code> each reference <code>store</code> in practice, but Postgres carries no FK constraint behind any of them — the schema will accept a value that points nowhere. This is a quirk of the Sakila sample database design, not something introduced by this analysis. These are omitted from the diagram because their absence from the constraint system means there's nothing architectural to show — just a convention the data happens to follow.</p>
+
+      <h3>This analysis was originally submitted as a slide deck, not a website</h3>
+      <p>The original Udacity submission presented these four queries as static slides with an accompanying Excel workbook &mdash; the format the assignment expected.  This site is a rebuild into a different medium, not a resubmission of new analysis: the underlying SQL, findings, and reasoning are the same work, restructured for the web rather than a deck.  The original slide deck is <a href="Final%20Submission/sql-project-submission%20-%20FINAL.pdf" target="_blank">linked here</a> as a historical record of that submission.</p>
     </div>
   </details>
 
@@ -435,7 +438,7 @@ function draw(pos, opts) {
       if (cls.includes('correct')) {
         fromColor = toColor = '#2D7D7B'; fromStroke = 1.5;
       } else if (cls.includes('wrong')) {
-        fromColor = '#B8860B';
+        fromColor = '#A8433D';
         toColor   = isUncorrectedWrong ? '#999' : '#2D7D7B';
         fromStroke = isUncorrectedWrong ? 2.5 : 1.5;
       } else {
@@ -486,13 +489,13 @@ function draw(pos, opts) {
 
   if (opts.showInDiagramKey) {
     if (opts.showInDiagramKey === 'both') {
-      svgContent += `<circle cx="175" cy="994" r="5" fill="#B8860B"/>
+      svgContent += `<circle cx="175" cy="994" r="5" fill="#A8433D"/>
       <text font-family="JetBrains Mono, monospace" font-size="11" fill="#666" x="187" y="998">Corrected connector</text>
       <circle cx="175" cy="1018" r="5" fill="#2D7D7B"/>
       <text font-family="JetBrains Mono, monospace" font-size="11" fill="#666" x="187" y="1022">Originally correct</text>`;
     } else {
       const label = opts.showInDiagramKey === 'corrected' ? 'Corrected connector' : 'Incorrect connector';
-      svgContent += `<circle cx="175" cy="994" r="5" fill="#B8860B"/>
+      svgContent += `<circle cx="175" cy="994" r="5" fill="#A8433D"/>
       <text font-family="JetBrains Mono, monospace" font-size="11" fill="#666" x="187" y="998">${label}</text>`;
     }
   }

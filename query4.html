@@ -16,8 +16,6 @@
     --border-faint: #E0D8CF;
     --teal: #2D7D7B;
     --teal-soft: #DCEBEA;
-    --amber: #B8860B;
-    --amber-soft: #F5E9CE;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -301,12 +299,13 @@
   <span class="current">4 &middot; Query 4</span>
 </div>
 
-<h1>Preference vs. Spend</h1>
-<p class="subtitle">Whether a customer&rsquo;s inferred taste for female-protagonist films says anything about how much they spend.</p>
-
-<p class="section-label">Business Question</p>
-<div class="card">
-  <p class="business-question">Identify customers with a preference for films with a female protagonist (&ldquo;Female Protagonist Positive&rdquo;). Next, divide the customer base (including all customers, not just ones identified as Female Protagonist Positive) into quartiles, based on each customer&rsquo;s total rental payments made (&ldquo;Customer Rental Revenue&rdquo;). Within each quartile, how much total Customer Rental Revenue is represented by customers identified as Female Protagonist Positive versus all other customers (&ldquo;No Preference&rdquo;)?</p>
+<h1>Deriving Product Attributes</h1>
+<div class="card" style="margin:1.5rem 0 2.5rem">
+  <p>Query 3 inferred customer preference from an existing product attribute &mdash; film length &mdash; which was already sitting in the schema, ready to use.  Query 4 builds on that idea in two critical ways, further enhancing the database&rsquo;s limited informational scope:</p>
+  <ol>
+    <li>The attribute needed here &mdash; whether a film has a female protagonist &mdash; doesn&rsquo;t exist anywhere in this database as structured data.  It had to be built by parsing raw, unstructured text from each film&rsquo;s description, checking whether &ldquo;woman&rdquo; or &ldquo;girl&rdquo; appeared as a grammatical subject in the description rather than incidentally elsewhere in it.  That parsing raised edge cases that needed evaluation &mdash; some words matched but had to be excluded, others were considered and deliberately never added as search terms at all.  Making judgment calls like these comes from a lifetime of accumulated context living in the real world &mdash; not from anything a schema could teach or a query could confirm.</li>
+    <li>Defining what actually counts as a preference.  A raw count of female-protagonist rentals isn&rsquo;t meaningful on its own &mdash; it only means something compared against how often such rentals would happen at random, given the makeup of the catalog.  A customer only counts as preferring these films if their personal rental rate for them exceeds that catalog-wide baseline rate.</li>
+  </ol>
 </div>
 
 <p class="section-label">Annotated Schema</p>
@@ -321,33 +320,13 @@
   </div>
 </div>
 
-<p class="section-label">Query Output</p>
-<div class="card">
-  <div class="chart-container">
-    <canvas id="q4chart"></canvas>
-  </div>
-</div>
-
-<p class="section-label">Key Finding</p>
-<div class="card">
-  <div class="key-finding">
-    <p>Total rental revenue from Female Protagonist Positive customers is nearly identical to No Preference customers in three of the four quartiles. Quartile 3 is the exception: Female Protagonist Positive customers represent under $5,000 in total rental revenue versus over $8,800 for No Preference customers.</p>
-  </div>
-</div>
-
 <p class="section-label">Reasoning</p>
 <div class="card">
-  <p>The first three queries all derive their power from relational reasoning &mdash; the schema already contains the relevant facts (a store&rsquo;s revenue, a customer&rsquo;s country, a film&rsquo;s length), and the work is in joining distant tables to connect those facts to each other. Query 4 is different. There&rsquo;s no column anywhere in this schema that says whether a film has a female protagonist. While that information doesn&rsquo;t exist as structured data, taking a few moments to read the raw data surfaces a pattern &mdash; every <code>description</code> takes the form &ldquo;subject(s)-verb-object(s).&rdquo; By parsing the unstructured text in each film&rsquo;s <code>description</code>, a new fact could be derived that wasn&rsquo;t there to begin with, using the text itself as the only available evidence.</p>
-  <p style="margin-top:0.75rem">Reading alone isn&rsquo;t a fully reliable methodology, since one still cannot read every <code>description</code> in the catalog &mdash; only a plausible sample. However, once the pattern has been recognized, systematic filtration for every <code>description</code> containing &ldquo;woman&rdquo; or &ldquo;girl&rdquo; surfaces edge cases that may have never been read directly.</p>
-  <p style="margin-top:0.75rem">Four edge cases came out of this process:</p>
-  <ol>
-    <li>Some descriptions mention &ldquo;woman&rdquo; or &ldquo;girl&rdquo; only after <code>' who '</code> &mdash; meaning the word isn&rsquo;t the subject in the <code>description</code>: &ldquo;A Epic Tale of a Pioneer And a Hunter who must Escape a Girl in A U-Boat&rdquo; isn&rsquo;t about a girl, it&rsquo;s about a pioneer and a hunter.</li>
-    <li>&ldquo;Womanizer&rdquo; matches &ldquo;woman&rdquo; as a raw substring but isn&rsquo;t necessarily a man or a woman: &ldquo;A Boring Character Study of a Man And a Womanizer who must Succumb a Teacher in An Abandoned Amusement Park&rdquo; &mdash; the word-boundary padding (<code>' Woman '</code> with leading and trailing spaces) exists specifically to exclude cases like this.</li>
-    <li>&ldquo;A Stunning Character Study of a Mad Scientist And a Mad Cow who must Kill a Car in A Monastery&rdquo; &mdash; a scientist isn&rsquo;t necessarily a man or a woman, so &ldquo;scientist&rdquo; was never added as a matching term.</li>
-    <li>&ldquo;A Boring Reflection of a Lumberjack And a Feminist who must Discover a Woman in Nigeria&rdquo; &mdash; a feminist isn&rsquo;t necessarily a man or a woman, so including it would have been an unjustified assumption, not a defensible inference.</li>
-  </ol>
-  <p style="margin-top:0.75rem">With the film-level list of female-protagonist films established, the next step was defining &ldquo;preference&rdquo; at the customer level &mdash; not just &ldquo;has this customer ever rented such a film,&rdquo; but whether they rent them more often than chance alone would predict. That baseline comes from the catalog itself: if some percentage of all films are female-protagonist films, a customer renting from that group at a higher rate than that baseline is renting them more than random selection would produce. Customers whose personal ratio exceeds the catalog-wide ratio are classified &ldquo;Female Protagonist Positive&rdquo;; everyone else falls into &ldquo;No Preference.&rdquo; That turns an otherwise arbitrary judgment call &mdash; how many such rentals count as a real preference? &mdash; into a threshold the data supplies on its own.</p>
-  <p style="margin-top:0.75rem">The second half of the query asks an entirely separate question: does this preference say anything about how much a customer spends? Or, conversely, does the amount of money a customer spends say anything about their preference for films with a female protagonist? Every customer &mdash; not just the Female Protagonist Positive ones &mdash; gets ranked into revenue quartiles based on total rental payments, then each quartile is split by preference classification to compare how much total revenue each group represents within its tier.</p>
+  <p>These films don&rsquo;t exist outside this database &mdash; the descriptions are synthetic text, with no real movies, IMDb pages, or external sources to check against.  Whatever can be determined about a film&rsquo;s protagonist has to come entirely from <code>film.description</code> itself.  Query 3 categorizes films by an attribute the schema already provides; Query 4 builds the attribute from scratch before any categorization is possible.  Reading a sample of these descriptions directly &mdash; not running code against them, but reading them with my own eyes &mdash; surfaced a consistent pattern: every description follows a fixed generation template, structured around the word &ldquo;who.&rdquo;  A query against the full catalog confirms the pattern holds without exception.  Exploiting that pattern, a description only counts as having a female protagonist if &ldquo;Woman&rdquo; or &ldquo;Girl&rdquo; appears before &ldquo;who,&rdquo; since that&rsquo;s the position a grammatical subject occupies in this structure.</p>
+  <p style="margin-top:0.75rem">The parsing process required checking in two directions, not just one.  First: examine every description that matched &ldquo;woman&rdquo; or &ldquo;girl&rdquo; to catch false positives &mdash; cases where the word appeared but didn&rsquo;t actually signal a female protagonist.  This is where &ldquo;Womanizer&rdquo; turned up, matching the raw substring search.  While &ldquo;womanizer&rdquo; is usually thought to be a man, it could in fact be a woman.  But the key here is that there is a possibility that it&rsquo;s a man, and a term only qualifies if it exclusively implies female.  Word-boundary padding (<code>' Woman '</code> with leading and trailing spaces) fixed it.</p>
+  <p style="margin-top:0.75rem">Second, and less obvious: examine descriptions that didn&rsquo;t match &ldquo;woman&rdquo; or &ldquo;girl&rdquo; at all, to check for false negatives &mdash; protagonists who were female without either of those specific words appearing.  This meant reading raw descriptions directly, looking for other language that might signal &ldquo;female&rdquo; just as reliably.  &ldquo;Feminist&rdquo; came up this way &mdash; briefly considered as a third search term, then rejected on the same logic: a feminist isn&rsquo;t necessarily a woman, so the term couldn&rsquo;t reliably signal one.</p>
+  <p style="margin-top:0.75rem">After the list of female-protagonist films is established, defining a &ldquo;preference&rdquo; for renting such films requires defining a measurable baseline.  Each customer&rsquo;s personal ratio of female-protagonist rentals to total rentals is compared against a catalog-wide ratio: the count of qualifying films divided by the count of all films in the catalog.  That catalog-wide ratio deliberately uses a count of unique films as the denominator, not inventory copies, so multiple copies of films don&rsquo;t skew the baseline.</p>
+  <p style="margin-top:0.75rem">The second half of the query asks a separate question: does this preference say anything about how much a customer spends?  Or conversely, does how much a customer spends say anything about their preference for female-protagonist films?  Every customer &mdash; not just the Female Protagonist Positive ones &mdash; is ranked into revenue quartiles via <code>NTILE(4)</code> and ordered by <code>SUM(p.amount)</code> descending.  That result is then pivoted, using <code>LAG()</code> to place the &ldquo;Female Protagonist Positive&rdquo; total alongside the &ldquo;No Preference&rdquo; total within each quartile, so the two groups can be compared side by side.</p>
 </div>
 
 <details class="sql-details">
@@ -469,6 +448,20 @@ SELECT customer_total_rental_revenue_quartile,
  WHERE no_preference IS NOT NULL;</pre>
   </div>
 </details>
+
+<p class="section-label" style="margin-top:3rem">Appendix</p>
+<div class="card">
+  <div class="chart-container">
+    <canvas id="q4chart"></canvas>
+  </div>
+</div>
+
+<p class="section-label">Key Finding</p>
+<div class="card">
+  <div class="key-finding">
+    <p>Total rental revenue from Female Protagonist Positive customers is nearly identical to No Preference customers in three of the four quartiles. Quartile 3 is the exception: Female Protagonist Positive customers represent under $5,000 in total rental revenue versus over $8,800 for No Preference customers.</p>
+  </div>
+</div>
 
 <!-- Modal for full corrected schema -->
 <div class="modal-overlay" id="modalOverlay">

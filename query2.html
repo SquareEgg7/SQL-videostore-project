@@ -300,12 +300,10 @@
   <a class="stepper-link" href="query4.html">4 &middot; Query 4</a>
 </div>
 
-<h1>Who Overpays the Most?</h1>
-<p class="subtitle">A country-by-country look at how far actual rental payments diverge from what customers technically owed.</p>
-
-<p class="section-label">Business Question</p>
-<div class="card">
-  <p class="business-question">For each country where customers live, aggregate total rental payments received and divide by total rental payments owed to determine the &ldquo;National Average Overpayment Rate.&rdquo; Which countries are in the top 10% of countries by National Average Overpayment Rate, and what is their rate of overpayment?</p>
+<h1>Variance Analysis: Comparing an Actual Result Against an Expected Result</h1>
+<div class="card" style="margin:1.5rem 0 2.5rem">
+  <p>Query 1 shows that data pulled from distant parts of a schema can be compared in a single analysis.  But there is no expectation for what the results of that analysis should be.  Query 2 goes a step further.  There is an expectation for what the results of this analysis should be (all customers have paid exactly what their rental history dictates they owe).  Any variance from that expectation then becomes the analysis.  The most reasonable expected variance is that certain customers are net underpaid.  However, this database reveals an even more interesting variance: no individual customer has paid exactly what they owe, and only 4% are net underpaid.  But a whopping 96% are net overpaid.  In fact, entire countries are net overpaid.  105 out of 108 countries are net overpaid.  This particular gap could become useful for opening an investigation into fraud, billing processes, or a database bug.</p>
+  <p style="margin-top:0.75rem">In general, comparing an actual outcome to an expected baseline &mdash; a variance analysis &mdash; can provide useful information anywhere an expected outcome exists.  For example, in an airline database every leg of a purchased multi-leg ticket is expected to show a matching boarding scan.  Occasional no-shows are normal noise.  But if unused legs cluster disproportionately at the end of itineraries rather than scattering randomly across all legs, it could be an indication that travelers are buying multi-leg fares to reach an interim destination because it&rsquo;s cheaper than a direct ticket.</p>
 </div>
 
 <p class="section-label">Annotated Schema</p>
@@ -321,28 +319,12 @@
   </div>
 </div>
 
-<p class="section-label">Query Output</p>
-<div class="card">
-  <div class="chart-container">
-    <canvas id="q2chart"></canvas>
-  </div>
-  <p class="chart-footnote">*Displayed as &lsquo;Runion&rsquo; to match the database&rsquo;s stored value (missing its accent); the actual country is R&eacute;union.</p>
-</div>
-
-<p class="section-label">Key Finding</p>
-<div class="card">
-  <div class="key-finding">
-    <p>Among countries with a positive National Average Overpayment Rate, 11 fall in the top 10%. Iraq leads at 62.56%, followed closely by French Guiana (58.30%) and Greenland (58.23%). The remaining eight range from Afghanistan (54.77%) down to R&eacute;union (43.38%).</p>
-  </div>
-</div>
-
 <p class="section-label">Reasoning</p>
 <div class="card">
-  <p>The original plan was to find individual customers who had underpaid &mdash; a straightforward search for payment shortfalls. I could then list them (if the list was short) or run further analyses on their location, rental habits, or other sub-metrics. Early exploratory queries turned that plan on its head: no customer had paid exactly what they owed, 4% of customers had underpaid, and a whopping 96% of customers had overpaid.</p>
-  <p style="margin-top:0.75rem">Given that 96% of customers in the database had overpaid, this metric seemed worth digging into. Further queries showed that overpayment was so widespread that it wasn&rsquo;t just individuals who had overpaid. On average, the entire customer base of entire countries had overpaid. To be exact, out of 108 countries, only 3 had underpaid in aggregate. The other 105 had all overpaid in aggregate. That reframed the question entirely. Rather than hunting for underpayers, the analysis shifted to quantifying just how widespread this overpayment pattern actually was, country by country.</p>
-  <p style="margin-top:0.75rem">Quantifying it needed its own metric, since raw dollar totals aren&rsquo;t comparable across countries with very different rental volumes. Dividing total paid by total owed, then subtracting 1, produces a rate &mdash; the &ldquo;National Average Overpayment Rate&rdquo; &mdash; that puts every country on the same scale regardless of size. <code>NTILE(10)</code>, applied only to the countries with a positive rate, then isolates the top decile of overpayers specifically.</p>
-  <p style="margin-top:0.75rem">The <code>LEFT JOIN</code> in the first CTE exists because of a specific discovery in those exploratory queries: some rentals had no payment row at all. An inner join would have silently dropped those unpaid rentals from the analysis entirely, understating how much was actually owed. The <code>CASE WHEN</code> alongside it converts those missing payments to $0.00, so they still count toward the total owed even though nothing was collected.</p>
-  <p style="margin-top:0.75rem">Stepping back, this query is really a template for a kind of audit: start from a reasonable operational assumption &mdash; that customers pay what they&rsquo;re charged &mdash; and measure how far reality diverges from it. A large, consistent, one-directional gap like this one doesn&rsquo;t prove any specific problem, but it&rsquo;s exactly the kind of signal that would justify investigating further: Is the point-of-sale system miscalculating charges? Are staff overcharging customers and pocketing the difference? Does the database&rsquo;s recorded payment differ from what was actually collected in cash or on a card? Is there something wrong with the database itself? Any of these real business problems are potentially implied by the finding of the query.</p>
+  <p>Comparing paid versus owed per rental, then rolling it up to paid versus owed per country means seven joins in a single chain to place each rental&rsquo;s paid and owed amounts inside a specific country.  This step is fundamentally the same as Query 1 &mdash; joining tables and columns from disparate parts of the schema.</p>
+  <p style="margin-top:0.75rem">The <code>LEFT JOIN</code> in the first CTE exists because of a specific discovery in the exploratory queries: some rentals had no payment row at all.  An inner join would have silently dropped those unpaid rentals from the analysis entirely, understating how much was actually owed.  The <code>CASE WHEN</code> alongside it converts those missing payments to $0.00, so they still count toward the total owed even though nothing was collected.</p>
+  <p style="margin-top:0.75rem">Once every rental carries a country, <code>table2</code> sums <code>amount_paid</code> and <code>amount_due</code> grouped by <code>country</code>, then divides the two sums and subtracts 1 to produce a rate &mdash; the &ldquo;National Average Overpayment Rate&rdquo; &mdash; that puts every country on the same scale regardless of size.</p>
+  <p style="margin-top:0.75rem"><code>table3</code> isolates the top decile of that rate.  <code>WHERE national_average_overpayment_rate &gt; 0</code> first drops any country that underpaid on average, so the ranking only considers overpaying countries.  <code>NTILE(10)</code>, ordered by that rate with no partition, then splits the remaining countries into ten equal-sized groups from highest rate to lowest; the final query keeps only decile 1 &mdash; the top 10% of overpaying countries specifically.</p>
 </div>
 
 <details class="sql-details">
@@ -401,6 +383,21 @@ SELECT country,
  WHERE national_average_overpayment_rate_decile = 1;</pre>
   </div>
 </details>
+
+<p class="section-label" style="margin-top:3rem">Appendix</p>
+<div class="card">
+  <div class="chart-container">
+    <canvas id="q2chart"></canvas>
+  </div>
+  <p class="chart-footnote">*Displayed as &lsquo;Runion&rsquo; to match the database&rsquo;s stored value (missing its accent); the actual country is R&eacute;union.</p>
+</div>
+
+<p class="section-label">Key Finding</p>
+<div class="card">
+  <div class="key-finding">
+    <p>Among countries with a positive National Average Overpayment Rate, 11 fall in the top 10%. Iraq leads at 62.56%, followed closely by French Guiana (58.30%) and Greenland (58.23%). The remaining eight range from Afghanistan (54.77%) down to R&eacute;union (43.38%).</p>
+  </div>
+</div>
 
 <!-- Modal for full corrected schema -->
 <div class="modal-overlay" id="modalOverlay">
