@@ -551,8 +551,12 @@ function render() {
   const paras = Array.isArray(s.body) ? s.body : [s.body];
   bodyEl.innerHTML = paras.map(t => `<p>${t}</p>`).join('');
   document.getElementById('stepLabel').textContent = `Step ${stepIdx+1} of ${steps.length}`;
-  document.getElementById('prevBtn').disabled = stepIdx === 0;
-  document.getElementById('nextBtn').disabled = stepIdx === steps.length - 1;
+  const prevBtn = document.getElementById('prevBtn');
+  const nextBtn = document.getElementById('nextBtn');
+  prevBtn.disabled = stepIdx === 0;
+  prevBtn.style.visibility = stepIdx === 0 ? 'hidden' : 'visible';
+  nextBtn.disabled = stepIdx === steps.length - 1;
+  nextBtn.style.visibility = stepIdx === steps.length - 1 ? 'hidden' : 'visible';
 }
 
 document.getElementById('prevBtn').addEventListener('click', () => {
